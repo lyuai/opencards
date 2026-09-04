@@ -7,7 +7,7 @@ type Card = { id: string; rank: string; suit: string; red?: boolean; joker?: boo
 type LegalPlay = { label: string; cards: string[] };
 type Turn = { player: string; cards?: Card[]; note?: string };
 type Trick = { number: number; winner: string; turns: Turn[] };
-type PlayerStyle = { label: string; evidence: string };
+type PlayerStyle = { label: string; evidence: string; confidence: number };
 
 const hand: Card[] = [
   { id: "3s", rank: "3", suit: "♠" }, { id: "3h", rank: "3", suit: "♥", red: true },
@@ -46,17 +46,15 @@ const playHistory: Trick[] = [
     { player: "East" }, { player: "You" },
   ] },
 ];
-const playerStyles: Record<string, PlayerStyle> = {
-  Partner: { label: "Aggressive finisher", evidence: "Overcalls often · 2 tricks won" },
-  West: { label: "Control spender", evidence: "Uses level cards early" },
-  East: { label: "Patient closer", evidence: "Passes selectively · holds power" },
-  You: { label: "Shape preserver", evidence: "Keeps bombs and control intact" },
-};
+const players = ["Partner", "West", "East", "You"];
+const startingCounts: Record<string, number> = { Partner: 12, West: 14, East: 15, You: 18 };
+const playerStyles = Object.fromEntries(players.map((player) => [player, inferStyle(player, playHistory)])) as Record<string, PlayerStyle>;
+const remainingCounts = Object.fromEntries(players.map((player) => [player, startingCounts[player] - playHistory.flatMap((trick) => trick.turns).filter((turn) => turn.player === player).reduce((total, turn) => total + (turn.cards?.length ?? 0), 0)])) as Record<string, number>;
 const historyForCoach = playHistory.map((trick) => `Trick ${trick.number}: ${trick.turns.map((turn) => `${turn.player} ${turn.cards?.map((card) => `${card.rank}${card.suit}`).join(" ") ?? "passed"}`).join(", ")}; ${trick.winner} won.`).join(" ");
-const stylesForCoach = Object.entries(playerStyles).map(([player, style]) => `${player}: ${style.label} (${style.evidence})`).join("; ");
+const stylesForCoach = Object.entries(playerStyles).map(([player, style]) => `${player}: ${style.label}, confidence ${Math.round(style.confidence * 100)}% (${style.evidence})`).join("; ");
 const sample = {
   game: "guandan", ruleset: "competition-draft-2026-09",
-  position: `Our team is level 2. I lead with 9 cards. My partner has 3 cards; opponents have 8 and 12. Known hand: 3♠ 3♥ 7♠ 7♥ 7♦ 9♣ 9♦ A♠ BJ. Complete play history: ${historyForCoach} Inferred player styles: ${stylesForCoach}`,
+  position: `Our team is level 2. I lead with ${remainingCounts.You} cards. My partner has ${remainingCounts.Partner} cards; opponents have ${remainingCounts.West} and ${remainingCounts.East}. Known visible hand: 3♠ 3♥ 7♠ 7♥ 7♦ 9♣ 9♦ A♠ BJ. Complete play history: ${historyForCoach} Styles inferred only from this replay: ${stylesForCoach}`,
   legalActions: plays.map((play) => play.label), playerGoal: "Help my partner finish first without wasting control cards.",
 };
 
@@ -93,12 +91,12 @@ export function CoachLab() {
     <div className="workspace">
       <section className="gameArea" aria-label="Guandan card table">
         <div className="table">
-          <Player className="north" seat="Partner" count={3}/><Player className="west" seat="West" count={8}/>
+          <Player className="north" seat="Partner"/><Player className="west" seat="West"/>
           <div className="tableCenter"><b>Your turn</b><span>Select a legal play</span></div>
-          <Player className="east" seat="East" count={12}/><Player className="south" seat="You" count={9}/>
+          <Player className="east" seat="East"/><Player className="south" seat="You"/>
         </div>
         <section className="history" aria-label="Complete play history">
-          <div className="historyTitle"><b>Play history</b><span>5 tricks · Partner won last · You lead</span></div>
+          <div className="historyTitle"><b>Play history <em>Manual sample</em></b><span>5 tricks · Partner won last · You lead</span></div>
           <div className="tricks">{playHistory.map((trick) => <div className="trick" key={trick.number}>
             <div className="trickMeta"><b>Trick {trick.number}</b><span>{trick.winner} won</span></div>
             <div className="turns">{trick.turns.map((turn) => <div className="turn" key={turn.player}>
@@ -130,9 +128,28 @@ export function CoachLab() {
   </main>;
 }
 
-function Player({ className, seat, count }: { className: string; seat: string; count: number }) {
+function Player({ className, seat }: { className: string; seat: string }) {
   const style = playerStyles[seat];
-  return <div className={`player ${className}`} title={style.evidence}><b>{seat}</b><span>{count} cards</span><em>{style.label}</em></div>;
+  return <div className={`player ${className}`} title={style.evidence}><b>{seat}</b><span>{remainingCounts[seat]} cards</span><em>{style.label} · {Math.round(style.confidence * 100)}%</em></div>;
 }
 function sameCards(a: string[], b: string[]) { return a.length === b.length && a.every((card) => b.includes(card)); }
 function cards(ids: string, values: string): Card[] { return values.split(" ").map((value, index) => ({ id: ids.split(",")[index], rank: value.slice(0, -1), suit: value.slice(-1), red: value.endsWith("♥") || value.endsWith("♦") })); }
+
+function inferStyle(player: string, history: Trick[]): PlayerStyle {
+  const turns = history.flatMap((trick) => trick.turns).filter((turn) => turn.player === player);
+  const plays = turns.filter((turn) => turn.cards?.length);
+  const passes = turns.length - plays.length;
+  const wins = history.filter((trick) => trick.winner === player).length;
+  const cardsPlayed = plays.reduce((total, turn) => total + (turn.cards?.length ?? 0), 0);
+  const passRate = turns.length ? passes / turns.length : 0;
+  const winRate = turns.length ? wins / turns.length : 0;
+  const averageSize = plays.length ? cardsPlayed / plays.length : 0;
+  const confidence = Math.min(.85, .2 + turns.length * .07);
+  const evidence = `${turns.length} decisions · ${Math.round(passRate * 100)}% pass rate · ${wins} tricks won · ${averageSize.toFixed(1)} cards/play`;
+
+  if (passRate >= .55) return { label: "Selective", evidence, confidence };
+  if (winRate >= .35) return { label: "Tempo driver", evidence, confidence };
+  if (averageSize >= 2.5) return { label: "Combination shedder", evidence, confidence };
+  if (passRate <= .2) return { label: "Frequent challenger", evidence, confidence };
+  return { label: "Balanced", evidence, confidence };
+}

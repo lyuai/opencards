@@ -25,6 +25,7 @@ header span { color: #98a29c; font-size: 13px; }
 .history { margin-top: 12px; padding: 12px; border: 1px solid #303a33; border-radius: 8px; background: #141915; }
 .historyTitle { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .historyTitle b { font-size: 12px; }
+.historyTitle b em { margin-left: 6px; padding: 2px 5px; border-radius: 4px; background: #2d332f; color: #9da79f; font-size: 8px; font-style: normal; font-weight: 500; text-transform: uppercase; }
 .historyTitle span { color: #93a097; font-size: 11px; }
 .tricks { display: grid; gap: 7px; max-height: 270px; overflow-y: auto; padding-right: 3px; }
 .trick { display: grid; grid-template-columns: 92px 1fr; gap: 8px; }
