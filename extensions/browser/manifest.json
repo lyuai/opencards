@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "OpenCards Capture",
+  "version": "0.1.0",
+  "description": "Capture timestamped game observations from an authorized browser session to the local OpenCards worker.",
+  "permissions": ["activeTab", "tabs"],
+  "host_permissions": ["http://127.0.0.1:8787/*", "https://www.bilibili.com/video/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "Start or stop OpenCards capture" },
+  "content_scripts": [{
+    "matches": ["https://www.bilibili.com/video/*"],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }]
+}

@@ -140,7 +140,7 @@ func main() {
 			writeError(w, http.StatusBadRequest, "invalid result")
 			return
 		}
-		item, err := jobs.update(r.PathValue("id"), request.WorkerID, "completed", "completed", "Inspection complete", 1, request.Result)
+		item, err := jobs.update(r.PathValue("id"), request.WorkerID, "completed", "completed", "Capture and local recognition complete", 1, request.Result)
 		if err != nil {
 			writeError(w, http.StatusConflict, err.Error())
 			return

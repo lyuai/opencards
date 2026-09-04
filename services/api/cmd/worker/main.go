@@ -26,7 +26,8 @@ type job struct {
 
 func main() {
 	api := env("OPENCARDS_API_URL", "http://localhost:8080")
-	installationID, err := loadInstallationID(env("OPENCARDS_WORKER_DATA_DIR", "data/worker"))
+	workerData := env("OPENCARDS_WORKER_DATA_DIR", "data/worker")
+	installationID, err := loadInstallationID(workerData)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -35,13 +36,19 @@ func main() {
 		log.Fatalf("register worker: %v", err)
 	}
 	log.Printf("worker %s registered", workerID)
+	coordinator := newCaptureCoordinator(api, workerID, workerData)
+	go func() {
+		if err := coordinator.serve(env("OPENCARDS_CAPTURE_ADDR", "127.0.0.1:8787")); err != nil {
+			log.Fatalf("capture bridge: %v", err)
+		}
+	}()
 
 	for {
 		item, err := lease(api, workerID)
 		if err != nil {
 			log.Printf("lease: %v", err)
 		} else if item != nil {
-			process(api, workerID, item)
+			process(api, workerID, item, coordinator)
 		}
 		if os.Getenv("OPENCARDS_WORKER_ONCE") == "1" {
 			return
@@ -50,19 +57,40 @@ func main() {
 	}
 }
 
-func process(api, workerID string, item *job) {
+func process(api, workerID string, item *job, coordinator *captureCoordinator) {
 	log.Printf("processing %s: %s", item.ID, item.Source.URL)
-	_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "inspecting", "progress": .25, "message": "Source accepted by local worker"}, nil)
+	_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "waiting_for_browser", "progress": .05, "message": "Open the video and click the OpenCards Capture extension"}, nil)
+	session := coordinator.begin(item)
+	var capture captureResult
+	heartbeat := time.NewTicker(20 * time.Second)
+	timeout := time.NewTimer(30 * time.Minute)
+	defer heartbeat.Stop()
+	defer timeout.Stop()
+	for capture.Directory == "" {
+		select {
+		case capture = <-session.done:
+		case <-heartbeat.C:
+			_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "waiting_for_browser", "progress": .05, "message": "Waiting for authenticated browser capture"}, nil)
+		case <-timeout.C:
+			coordinator.cancel(session)
+			log.Printf("capture timeout for %s", item.ID)
+			return
+		}
+	}
+	_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "recognizing", "progress": .65, "message": fmt.Sprintf("Running local OCR on %d changed frames", len(capture.Observations))}, nil)
+	capture.Observations = recognizeObservations(capture.Directory, capture.Observations)
 	sourceID := item.Source.URL
 	if marker := strings.Index(sourceID, "BV"); marker >= 0 {
 		sourceID = strings.FieldsFunc(sourceID[marker:], func(r rune) bool { return r == '/' || r == '?' })[0]
 	}
 	result := map[string]any{
 		"schemaVersion": "1.0.0", "game": item.Game,
-		"provenance":       map[string]any{"sourceType": "video", "sourceId": sourceID, "sourceUrl": item.Source.URL, "inspectedAt": time.Now().UTC()},
-		"extractionStatus": "browser_capture_pending",
-		"message":          "The worker protocol is active. Authenticated browser capture is the next adapter stage; no play events were fabricated.",
-		"events":           []any{},
+		"provenance":        map[string]any{"sourceType": "video", "sourceId": sourceID, "sourceUrl": item.Source.URL, "inspectedAt": time.Now().UTC()},
+		"extractionStatus":  "observations_captured",
+		"message":           fmt.Sprintf("Captured %d timestamped browser observations. Replay events require vision and rules validation.", len(capture.Observations)),
+		"observations":      capture.Observations,
+		"evidenceDirectory": capture.Directory,
+		"events":            []any{},
 	}
 	if err := post(api+"/v1/jobs/"+item.ID+"/complete", map[string]any{"workerId": workerID, "result": result}, nil); err != nil {
 		log.Printf("complete %s: %v", item.ID, err)

@@ -27,6 +27,14 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .jobStatus em { color: #d8aa43; font-style: normal; text-transform: capitalize; }
 .statusDot { width: 7px; height: 7px; border-radius: 50%; background: #d8aa43; }
 .statusDot.completed { background: #62b884; }
+.captureSummary { margin-top: 12px; padding: 11px; display: grid; gap: 4px; border-radius: 7px; background: #202720; }
+.captureSummary b { color: #72c18d; font-size: 12px; }
+.captureSummary span { color: #9ba69e; font-size: 11px; }
+.captureSteps { max-width: 1320px; margin: 14px auto 0; padding: 16px; border: 1px solid #303a33; border-radius: 10px; background: #181e1a; }
+.captureSteps > b { font-size: 13px; }
+.captureSteps ol { margin: 10px 0; padding-left: 20px; color: #c0c8c2; font-size: 12px; line-height: 1.8; }
+.captureSteps code { padding: 2px 5px; border-radius: 4px; background: #101411; color: #e1b552; }
+.captureSteps p { margin: 0; color: #87938b; font-size: 10px; }
 .workspace { max-width: 1320px; margin: 20px auto 0; display: grid; grid-template-columns: minmax(620px, 1fr) 360px; gap: 16px; }
 .gameArea, aside { background: #181e1a; border: 1px solid #303a33; border-radius: 12px; }
 .gameArea { padding: 16px; }

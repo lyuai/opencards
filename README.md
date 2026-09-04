@@ -41,9 +41,12 @@ go run ./cmd/worker
 ```
 
 Submit a Bilibili URL in the web interface. The job is persisted locally, leased
-to the worker, and updated through heartbeat/completion endpoints. The current
-worker deliberately returns `browser_capture_pending`; it proves the task path
-without inventing replay events before the authenticated capture adapter exists.
+to the worker, and updated through heartbeat/completion endpoints. Load the
+unpacked Chrome extension from `extensions/browser`. It captures only the visible
+video region from the authenticated browser and sends binary JPEG observations to
+the local worker at `127.0.0.1:8787`. The worker drops near-duplicate frames, runs
+bounded-parallel local OCR, and returns timestamped evidence. It does not export
+cookies, discover protected media URLs, or fabricate unverified replay events.
 
 Then open <http://localhost:3000>. The API listens on
 <http://localhost:8080>; `GET /healthz` and `GET /v1/games` are available.
