@@ -24,6 +24,25 @@ func TestGameCoachOnlyReceivesEngineVerifiedChoices(t *testing.T) {
 	}
 }
 
+func TestCoachKeepsStrategicChoicesLegalAndSuppliesEvidence(t *testing.T) {
+	hand := []playingCard{
+		{ID: "3c", Rank: "3", Suit: "♣"}, {ID: "4c", Rank: "4", Suit: "♣"}, {ID: "5c", Rank: "5", Suit: "♣"}, {ID: "6c", Rank: "6", Suit: "♣"}, {ID: "7c", Rank: "7", Suit: "♣"},
+		{ID: "8a", Rank: "8", Suit: "♣"}, {ID: "8b", Rank: "8", Suit: "♦"}, {ID: "8c", Rank: "8", Suit: "♥"}, {ID: "8d", Rank: "8", Suit: "♠"},
+	}
+	foundControlChoice := false
+	for _, choice := range legalChoicesFor(hand, nil) {
+		if choice.Combo != nil && choice.Combo.Type == "straight_flush" {
+			foundControlChoice = true
+		}
+	}
+	if !foundControlChoice {
+		t.Fatal("a legal straight flush was removed by coaching policy")
+	}
+	if len(guandanStrategyEvidence) < 3 {
+		t.Fatal("coach request lacks sourced strategic evidence")
+	}
+}
+
 func mustTake(t *testing.T, hand []playingCard, ids []string) []playingCard {
 	t.Helper()
 	cards, err := takeCards(hand, ids)

@@ -31,7 +31,17 @@ func (store *gameStore) coachingRequest(id string) (coachRequest, map[string]leg
 	}
 	state := map[string]any{"levelRank": "2", "yourSeat": "south", "partner": "north", "turnOrder": seatOrder, "yourHand": session.Hands["south"], "remainingCounts": map[string]int{"south": len(session.Hands["south"]), "east": len(session.Hands["east"]), "north": len(session.Hands["north"]), "west": len(session.Hands["west"])}, "currentPlay": session.Current, "history": session.History}
 	encoded, _ := json.Marshal(state)
-	return coachRequest{Game: "guandan", Ruleset: "competition-draft-2026-09", Position: string(encoded), LegalActions: labels, PlayerGoal: "Maximize partnership finishing position. Explain the tactical reason in Chinese."}, lookup, nil
+	return coachRequest{
+		Game: "guandan", Ruleset: "competition-draft-2026-09", Position: string(encoded), LegalActions: labels,
+		PlayerGoal: "Maximize partnership finishing position. Explain the tactical reason in Chinese.",
+		Evidence:   guandanStrategyEvidence,
+	}, lookup, nil
+}
+
+var guandanStrategyEvidence = []strategyEvidence{
+	{ID: "guandan.strategy.ai-policy", Claim: "Treat Guandan as a long-horizon, imperfect-information cooperative-competitive game; compare actions by expected partnership outcome rather than immediate cards shed.", EvidenceType: "peer-reviewed reinforcement-learning result and public benchmark", Applicability: "all decisions, especially openings with many legal actions", Limitations: "the language model is not the trained SDMC policy and must report uncertainty"},
+	{ID: "guandan.strategy.control-economy", Claim: "Bombs and straight flushes are tempo/control resources. Spending one requires comparing the future control lost with the concrete gain now; retaining one is not an absolute rule.", EvidenceType: "expert strategy literature, retained as a hypothesis for evaluation", Applicability: "opening and midgame decisions involving bombs or straight flushes", Limitations: "endgame, partner rescue, or immediate opponent threat can justify early use"},
+	{ID: "guandan.strategy.tom-history", Claim: "Use action history and remaining counts to infer likely partner/opponent needs, while keeping hidden-card conclusions explicitly uncertain.", EvidenceType: "published LLM Theory-of-Mind Guandan study", Applicability: "after observable actions provide behavioral evidence", Limitations: "an inference is not knowledge of hidden cards"},
 }
 
 func legalChoicesFor(hand []playingCard, current *gameAction) []legalChoice {

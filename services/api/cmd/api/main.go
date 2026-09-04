@@ -20,11 +20,19 @@ type game struct {
 }
 
 type coachRequest struct {
-	Game         string   `json:"game"`
-	Ruleset      string   `json:"ruleset"`
-	Position     string   `json:"position"`
-	LegalActions []string `json:"legalActions"`
-	PlayerGoal   string   `json:"playerGoal"`
+	Game         string             `json:"game"`
+	Ruleset      string             `json:"ruleset"`
+	Position     string             `json:"position"`
+	LegalActions []string           `json:"legalActions"`
+	PlayerGoal   string             `json:"playerGoal"`
+	Evidence     []strategyEvidence `json:"evidence,omitempty"`
+}
+type strategyEvidence struct {
+	ID            string `json:"id"`
+	Claim         string `json:"claim"`
+	EvidenceType  string `json:"evidenceType"`
+	Applicability string `json:"applicability"`
+	Limitations   string `json:"limitations"`
 }
 type coachResponse struct {
 	Recommendation string   `json:"recommendation"`

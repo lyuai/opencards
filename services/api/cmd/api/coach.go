@@ -54,7 +54,7 @@ func newCoachClient() coacher {
 	}
 }
 
-const coachInstructions = "You are an evidence-bound card-game coach. Choose recommendation exactly from legalActions. Never invent visible or hidden state. Explain tradeoffs briefly. citationIds may only contain guandan.rules.overview or guandan.strategy.model. Treat the ruleset as a research prototype and surface uncertainty."
+const coachInstructions = "You are an evidence-bound Guandan decision analyst. Choose the recommendation exactly from legalActions and never invent visible or hidden state. Evaluate the supplied actions against the partnership objective over the whole deal, using the supplied evidence as defeasible guidance rather than hard rules. Compare at least the recommended action with a cheaper control-card alternative when relevant. Explain opportunity cost, partner impact, and hidden-information uncertainty in Chinese. citationIds may contain only IDs present in evidence plus guandan.rules.overview. Do not claim the language model has simulated win rates. Treat this as a research prototype and lower confidence when evidence is insufficient."
 
 func firstEnv(names ...string) string {
 	for _, name := range names {
