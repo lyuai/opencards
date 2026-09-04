@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +49,14 @@ func main() {
 	mux := http.NewServeMux()
 	feedback := &feedbackStore{}
 	client := newCoachClient()
+	dataDirectory := os.Getenv("OPENCARDS_DATA_DIR")
+	if dataDirectory == "" {
+		dataDirectory = "data"
+	}
+	jobs, err := newJobStore(filepath.Join(dataDirectory, "jobs.json"))
+	if err != nil {
+		log.Fatalf("open job store: %v", err)
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -56,6 +65,87 @@ func main() {
 			{ID: "guandan", Name: "掼蛋", Status: "research"},
 			{ID: "kards", Name: "KARDS", Status: "planned"},
 		}})
+	})
+	mux.HandleFunc("POST /v1/imports", func(w http.ResponseWriter, r *http.Request) {
+		var request importRequest
+		if err := decodeJSON(r, &request); err != nil || request.Game == "" || request.Source.Provider == "" || request.Source.URL == "" {
+			writeError(w, http.StatusBadRequest, "game, source.provider, and source.url are required")
+			return
+		}
+		item, err := jobs.create(request)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "could not persist import")
+			return
+		}
+		writeJSON(w, http.StatusAccepted, item)
+	})
+	mux.HandleFunc("GET /v1/imports/{id}", func(w http.ResponseWriter, r *http.Request) {
+		item, ok := jobs.get(r.PathValue("id"))
+		if !ok {
+			writeError(w, http.StatusNotFound, "import not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, item)
+	})
+	mux.HandleFunc("POST /v1/workers/register", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			InstallationID string   `json:"installationId"`
+			Capabilities   []string `json:"capabilities"`
+		}
+		if err := decodeJSON(r, &request); err != nil || request.InstallationID == "" {
+			writeError(w, http.StatusBadRequest, "installationId is required")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"workerId": "worker-" + request.InstallationID, "leaseSeconds": 45})
+	})
+	mux.HandleFunc("POST /v1/jobs/lease", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			WorkerID string `json:"workerId"`
+		}
+		if err := decodeJSON(r, &request); err != nil || request.WorkerID == "" {
+			writeError(w, http.StatusBadRequest, "workerId is required")
+			return
+		}
+		item, err := jobs.lease(request.WorkerID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "could not lease job")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"job": item})
+	})
+	mux.HandleFunc("POST /v1/jobs/{id}/heartbeat", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			WorkerID string  `json:"workerId"`
+			Stage    string  `json:"stage"`
+			Message  string  `json:"message"`
+			Progress float64 `json:"progress"`
+		}
+		if err := decodeJSON(r, &request); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid heartbeat")
+			return
+		}
+		item, err := jobs.update(r.PathValue("id"), request.WorkerID, "leased", request.Stage, request.Message, request.Progress, nil)
+		if err != nil {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, item)
+	})
+	mux.HandleFunc("POST /v1/jobs/{id}/complete", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			WorkerID string         `json:"workerId"`
+			Result   map[string]any `json:"result"`
+		}
+		if err := decodeJSON(r, &request); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid result")
+			return
+		}
+		item, err := jobs.update(r.PathValue("id"), request.WorkerID, "completed", "completed", "Inspection complete", 1, request.Result)
+		if err != nil {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, item)
 	})
 	mux.HandleFunc("POST /v1/coach", func(w http.ResponseWriter, r *http.Request) {
 		var request coachRequest

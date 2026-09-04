@@ -9,3 +9,4 @@ dist/
 coverage/
 bin/
 *.log
+services/api/data/*.json

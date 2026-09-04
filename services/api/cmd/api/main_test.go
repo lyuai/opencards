@@ -3,6 +3,7 @@ package main
 import (
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -75,5 +76,30 @@ func TestChatCompletionsConfiguration(t *testing.T) {
 	}
 	if client.endpoint != "https://provider.example/v1/chat/completions" {
 		t.Fatalf("endpoint = %q", client.endpoint)
+	}
+}
+
+func TestJobLeaseAndCompletion(t *testing.T) {
+	store, err := newJobStore(filepath.Join(t.TempDir(), "jobs.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := store.create(importRequest{Game: "guandan", Source: importSource{Provider: "bilibili", URL: "https://www.bilibili.com/video/BVtest"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	leased, err := store.lease("worker-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if leased == nil || leased.ID != created.ID || leased.WorkerID != "worker-local" {
+		t.Fatalf("unexpected lease: %#v", leased)
+	}
+	completed, err := store.update(created.ID, "worker-local", "completed", "completed", "done", 1, map[string]any{"events": []any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Status != "completed" || completed.Progress != 1 {
+		t.Fatalf("unexpected completion: %#v", completed)
 	}
 }

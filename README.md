@@ -11,6 +11,7 @@ is the new web-first platform; a Unity client will consume the same APIs later.
 ```text
 apps/web/             Next.js coaching and replay interface
 services/api/         Go API and orchestration service
+services/api/cmd/worker/ Self-registering local extraction worker
 packages/contracts/   Versioned JSON Schemas shared by every client
 knowledge/            Obsidian-compatible rules and strategy vault
 docs/                 Architecture, decisions, and delivery roadmap
@@ -31,6 +32,18 @@ In another terminal:
 cd services/api
 go run ./cmd/api
 ```
+
+Start the first local worker in a third terminal:
+
+```sh
+cd services/api
+go run ./cmd/worker
+```
+
+Submit a Bilibili URL in the web interface. The job is persisted locally, leased
+to the worker, and updated through heartbeat/completion endpoints. The current
+worker deliberately returns `browser_capture_pending`; it proves the task path
+without inventing replay events before the authenticated capture adapter exists.
 
 Then open <http://localhost:3000>. The API listens on
 <http://localhost:8080>; `GET /healthz` and `GET /v1/games` are available.
