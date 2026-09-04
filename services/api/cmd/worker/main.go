@@ -86,6 +86,7 @@ func process(api, workerID string, item *job, coordinator *captureCoordinator) {
 	}
 	_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "recognizing", "progress": .65, "message": fmt.Sprintf("Preparing %d table-change candidates", len(capture.Observations))}, nil)
 	stable := stableCandidates(capture.Observations, 3*time.Second)
+	validation := validateTimeline(stable, 30*time.Second)
 	sourceID := item.Source.URL
 	if marker := strings.Index(sourceID, "BV"); marker >= 0 {
 		sourceID = strings.FieldsFunc(sourceID[marker:], func(r rune) bool { return r == '/' || r == '?' })[0]
@@ -98,6 +99,7 @@ func process(api, workerID string, item *job, coordinator *captureCoordinator) {
 		"recognitionStrategy": "table-roi-change-detection",
 		"observations":        capture.Observations,
 		"stableCandidates":    stable,
+		"validation":          validation,
 		"metrics": map[string]any{
 			"changedFrames":  len(capture.Observations),
 			"stableFrames":   len(stable),
