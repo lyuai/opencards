@@ -47,6 +47,10 @@ Supported protocols are `responses` and `chat-completions`. The conventional `OP
 using Chat Completions should request JSON output; the server still rejects any
 recommendation that is not present in the submitted legal-action list.
 
+The prototype preset uses `openai/gpt-5.6-luna` through OpenRouter's Responses API.
+It keeps provider routing replaceable while giving the coaching path native
+Structured Outputs at a cost-efficient model tier.
+
 The current vertical slice submits a 掼蛋 position and a deterministic list of
 legal actions to `POST /v1/coach`. OpenAI Structured Outputs return the selected
 action, rationale, assumptions, confidence, and knowledge IDs. The backend rejects
