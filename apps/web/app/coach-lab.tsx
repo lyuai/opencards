@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 
 type CoachResult = { recommendation: string; rationale: string; alternatives: string[]; assumptions: string[]; confidence: number; citationIds: string[]; provider: string };
 type Card = { id: string; rank: string; suit: string; red?: boolean; joker?: boolean };
@@ -8,7 +9,6 @@ type LegalPlay = { label: string; cards: string[] };
 type Turn = { player: string; cards?: Card[]; note?: string };
 type Trick = { number: number; winner: string; turns: Turn[] };
 type PlayerStyle = { label: string; evidence: string; confidence: number };
-type ImportJob = { id: string; status: string; stage: string; progress: number; message?: string; result?: { extractionStatus?: string; message?: string } };
 
 const hand: Card[] = [
   { id: "3s", rank: "3", suit: "♠" }, { id: "3h", rank: "3", suit: "♥", red: true },
@@ -88,8 +88,7 @@ export function CoachLab() {
   }
 
   return <main>
-    <header><b>OpenCards</b><span>掼蛋 · Level 2 · Hand 6 · You lead</span></header>
-    <ImportPanel api={api}/>
+    <header><b>OpenCards</b><nav><Link className="active" href="/">Play</Link><Link href="/training">Training</Link></nav><span>掼蛋 · Level 2 · Hand 6 · You lead</span></header>
     <div className="workspace">
       <section className="gameArea" aria-label="Guandan card table">
         <div className="table">
@@ -128,37 +127,6 @@ export function CoachLab() {
       </aside>
     </div>
   </main>;
-}
-
-function ImportPanel({ api }: { api: string }) {
-  const [url, setURL] = useState("https://www.bilibili.com/video/BV1Cztq6EE5G/");
-  const [job, setJob] = useState<ImportJob | null>(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!job || job.status === "completed" || job.status === "failed") return;
-    const timer = window.setInterval(async () => {
-      const response = await fetch(`${api}/v1/imports/${job.id}`);
-      if (response.ok) setJob(await response.json());
-    }, 1500);
-    return () => window.clearInterval(timer);
-  }, [api, job]);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault(); setError("");
-    try {
-      const response = await fetch(`${api}/v1/imports`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ game: "guandan", source: { provider: "bilibili", url } }) });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Could not create import");
-      setJob(body);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not create import"); }
-  }
-
-  return <section className="importPanel" aria-label="Video import">
-    <form onSubmit={submit}><div><b>Import game video</b><span>The local worker will claim this task.</span></div><input aria-label="Bilibili video URL" value={url} onChange={(event) => setURL(event.target.value)} type="url" required/><button type="submit">Create task</button></form>
-    {job && <div className="jobStatus"><span className={`statusDot ${job.status}`}/><b>{job.stage.replaceAll("_", " ")}</b><progress value={job.progress} max="1"/><span>{job.message || `Waiting for a local worker · ${job.id}`}</span>{job.result?.extractionStatus && <em>{job.result.extractionStatus.replaceAll("_", " ")}</em>}</div>}
-    {error && <p className="error">{error}. Is the Go API running?</p>}
-  </section>;
 }
 
 function Player({ className, seat }: { className: string; seat: string }) {
