@@ -184,12 +184,12 @@ func coachHint(session *gameSession) map[string]any {
 	}
 	choice := chooseAIPlay(session.Hands["south"], session.Current, true)
 	if len(choice) == 0 {
-		return map[string]any{"available": true, "action": "pass", "cardIds": []string{}, "reason": "No economical legal response; preserve the hand."}
+		return map[string]any{"available": true, "action": "pass", "cardIds": []string{}, "reason": "当前没有合适的低成本压制牌，建议不出，保留手牌结构和控制牌。"}
 	}
 	combo, _ := classify(choice)
-	reason := "Lead the lowest economical combination and preserve control cards."
+	reason := "你是本圈首家，建议先出最小的合法牌，减少手数并保留大牌、炸弹等控制牌。"
 	if session.Current != nil {
-		reason = "Use the lowest combination that beats the table and avoid spending a bomb."
+		reason = fmt.Sprintf("桌面是%s，建议用刚好能压住的最小牌型，避免过早消耗炸弹和高级控制牌。", session.Current.Combination.Type)
 	}
 	return map[string]any{"available": true, "action": "play", "cardIds": idsOf(choice), "combination": combo, "reason": reason}
 }

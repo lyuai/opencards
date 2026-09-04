@@ -96,6 +96,7 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .playingCard.joker { background: #2a302c; color: #edc25f; }
 .playingCard.joker span { font-size: 11px; }
 .playingCard.wild { border-color: #e0ad3f; background: #fff6dc; }
+.playingCard.recommended { border-style: dashed; border-color: #e0ad3f; }
 .playingCard small { position: absolute; right: 5px; bottom: 5px; color: #b47b10; font-size: 9px; }
 .actions { margin-top: 12px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: end; }
 .playOptions { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -106,10 +107,13 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .secondary { padding: 9px 13px; border: 1px solid #46534b; border-radius: 7px; background: transparent; color: #dce2de; font-weight: 650; }
 .secondary:disabled { opacity: .35; cursor: default; }
 .playControls { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
-.coachHint { margin-top: 12px; padding: 11px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #4d4228; border-radius: 8px; background: #211e16; }
-.coachHint > div { display: grid; gap: 3px; }
+.coachHint { margin-top: 12px; padding: 14px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 18px; border: 1px solid #6b5628; border-radius: 8px; background: #211e16; }
+.coachAdvice { display: grid; gap: 7px; }
 .coachHint b { color: #e1b552; font-size: 11px; }
-.coachHint span { color: #b8b09c; font-size: 10px; }
+.coachHint h3 { margin: 0; color: #f0e5c9; font-size: 17px; }
+.coachHint span { max-width: 720px; color: #c7bea9; font-size: 11px; line-height: 1.5; }
+.coachHint small { color: #847d6e; font-size: 9px; }
+.coachButtons { display: grid; gap: 7px; }
 .dealNotice { margin-top: 12px; padding: 10px 12px; display: flex; justify-content: space-between; gap: 12px; border-radius: 7px; background: #141915; }
 .dealNotice b { color: #d8aa43; font-size: 11px; }
 .error { margin: 12px 0 0; color: #ff958b; font-size: 12px; }
