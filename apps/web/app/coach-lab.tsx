@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 type CoachResult = { recommendation: string; rationale: string; alternatives: string[]; assumptions: string[]; confidence: number; citationIds: string[]; provider: string };
 type Card = { id: string; rank: string; suit: string; red?: boolean; joker?: boolean };
 type LegalPlay = { label: string; cards: string[] };
+type Turn = { player: string; cards?: Card[]; note?: string };
 
 const hand: Card[] = [
   { id: "3s", rank: "3", suit: "♠" }, { id: "3h", rank: "3", suit: "♥", red: true },
@@ -21,9 +22,15 @@ const plays: LegalPlay[] = [
   { label: "Play single A", cards: ["as"] },
   { label: "Play black joker", cards: ["bj"] },
 ];
+const playHistory: Turn[] = [
+  { player: "West", cards: [{ id: "w4s", rank: "4", suit: "♠" }, { id: "w4h", rank: "4", suit: "♥", red: true }] },
+  { player: "Partner", cards: [{ id: "p6c", rank: "6", suit: "♣" }, { id: "p6d", rank: "6", suit: "♦", red: true }], note: "Won trick" },
+  { player: "East" },
+  { player: "You" },
+];
 const sample = {
   game: "guandan", ruleset: "competition-draft-2026-09",
-  position: "Our team is level 2. I lead with 9 cards. My partner has 3 cards; opponents have 8 and 12. Known hand: 3♠ 3♥ 7♠ 7♥ 7♦ 9♣ 9♦ A♠ BJ.",
+  position: "Our team is level 2. I lead with 9 cards. My partner has 3 cards; opponents have 8 and 12. Known hand: 3♠ 3♥ 7♠ 7♥ 7♦ 9♣ 9♦ A♠ BJ. Last trick: West played 4♠ 4♥, Partner played 6♣ 6♦ and won, East passed, I passed.",
   legalActions: plays.map((play) => play.label), playerGoal: "Help my partner finish first without wasting control cards.",
 };
 
@@ -64,6 +71,14 @@ export function CoachLab() {
           <div className="tableCenter"><b>Your turn</b><span>Select a legal play</span></div>
           <Player className="east" seat="East" count={12}/><Player className="south" seat="You" count={9}/>
         </div>
+        <section className="history" aria-label="Cards played in the previous trick">
+          <div className="historyTitle"><b>Previous trick</b><span>Partner won · You lead</span></div>
+          <div className="turns">{playHistory.map((turn) => <div className="turn" key={turn.player}>
+            <span className="turnPlayer">{turn.player}</span>
+            {turn.cards ? <div className="playedCards">{turn.cards.map((card) => <span className={card.red ? "red" : ""} key={card.id}>{card.rank}{card.suit}</span>)}</div> : <i>Pass</i>}
+            {turn.note && <small>{turn.note}</small>}
+          </div>)}</div>
+        </section>
         <div className="hand" aria-label="Your hand">{hand.map((card) => <button key={card.id} type="button" aria-pressed={selected.includes(card.id)} aria-label={`${card.rank} ${card.suit}`} className={`playingCard ${card.red ? "red" : ""} ${card.joker ? "joker" : ""}`} onClick={() => setSelected((current) => current.includes(card.id) ? current.filter((item) => item !== card.id) : [...current, card.id])}><span>{card.rank}</span><i>{card.suit}</i></button>)}</div>
         <div className="actions">
           <div className="playOptions" aria-label="Legal plays">{plays.map((play) => <button type="button" key={play.label} className={selectedPlay?.label === play.label ? "chosen" : ""} onClick={() => { setSelected(play.cards); setFeedbackState(""); }}>{play.label.replace("Play ", "")}</button>)}</div>
