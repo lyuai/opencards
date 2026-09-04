@@ -59,38 +59,45 @@ func main() {
 
 func process(api, workerID string, item *job, coordinator *captureCoordinator) {
 	log.Printf("processing %s: %s", item.ID, item.Source.URL)
-	_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "waiting_for_browser", "progress": .05, "message": "Open the video and click the OpenCards Capture extension"}, nil)
-	session := coordinator.begin(item)
-	var capture captureResult
-	heartbeat := time.NewTicker(20 * time.Second)
-	timeout := time.NewTimer(30 * time.Minute)
-	defer heartbeat.Stop()
-	defer timeout.Stop()
-	for capture.Directory == "" {
-		select {
-		case capture = <-session.done:
-		case <-heartbeat.C:
-			_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "waiting_for_browser", "progress": .05, "message": "Waiting for authenticated browser capture"}, nil)
-		case <-timeout.C:
-			coordinator.cancel(session)
-			log.Printf("capture timeout for %s", item.ID)
-			return
+	downloadHeartbeat := func(message string) {
+		_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "downloading", "progress": .1, "message": message}, nil)
+	}
+	downloadHeartbeat("Downloading publicly accessible media")
+	capture, downloadErr := downloadAndSample(item, coordinator.dataDir, downloadHeartbeat)
+	if downloadErr != nil {
+		log.Printf("direct download unavailable for %s: %v; falling back to browser", item.ID, downloadErr)
+		_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "waiting_for_browser", "progress": .05, "message": "Direct download unavailable; open the video and click OpenCards Capture"}, nil)
+		session := coordinator.begin(item)
+		heartbeat := time.NewTicker(20 * time.Second)
+		timeout := time.NewTimer(30 * time.Minute)
+		defer heartbeat.Stop()
+		defer timeout.Stop()
+		for capture.Directory == "" {
+			select {
+			case capture = <-session.done:
+			case <-heartbeat.C:
+				_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "waiting_for_browser", "progress": .05, "message": "Waiting for authenticated browser capture"}, nil)
+			case <-timeout.C:
+				coordinator.cancel(session)
+				log.Printf("capture timeout for %s", item.ID)
+				return
+			}
 		}
 	}
-	_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "recognizing", "progress": .65, "message": fmt.Sprintf("Running local OCR on %d changed frames", len(capture.Observations))}, nil)
-	capture.Observations = recognizeObservations(capture.Directory, capture.Observations)
+	_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "recognizing", "progress": .65, "message": fmt.Sprintf("Preparing %d table-change candidates", len(capture.Observations))}, nil)
 	sourceID := item.Source.URL
 	if marker := strings.Index(sourceID, "BV"); marker >= 0 {
 		sourceID = strings.FieldsFunc(sourceID[marker:], func(r rune) bool { return r == '/' || r == '?' })[0]
 	}
 	result := map[string]any{
 		"schemaVersion": "1.0.0", "game": item.Game,
-		"provenance":        map[string]any{"sourceType": "video", "sourceId": sourceID, "sourceUrl": item.Source.URL, "inspectedAt": time.Now().UTC()},
-		"extractionStatus":  "observations_captured",
-		"message":           fmt.Sprintf("Captured %d timestamped browser observations. Replay events require vision and rules validation.", len(capture.Observations)),
-		"observations":      capture.Observations,
-		"evidenceDirectory": capture.Directory,
-		"events":            []any{},
+		"provenance":          map[string]any{"sourceType": "video", "sourceId": sourceID, "sourceUrl": item.Source.URL, "inspectedAt": time.Now().UTC()},
+		"extractionStatus":    "observations_captured",
+		"message":             fmt.Sprintf("Captured %d timestamped observations. Replay events require vision and rules validation.", len(capture.Observations)),
+		"recognitionStrategy": "table-roi-change-detection",
+		"observations":        capture.Observations,
+		"evidenceDirectory":   capture.Directory,
+		"events":              []any{},
 	}
 	if err := post(api+"/v1/jobs/"+item.ID+"/complete", map[string]any{"workerId": workerID, "result": result}, nil); err != nil {
 		log.Printf("complete %s: %v", item.ID, err)

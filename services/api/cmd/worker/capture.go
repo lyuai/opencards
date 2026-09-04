@@ -134,7 +134,27 @@ func frameSignature(data []byte) ([]uint8, error) {
 	if err != nil {
 		return nil, err
 	}
+	return imageSignature(imageValue, imageValue.Bounds()), nil
+}
+
+func tableSignature(data []byte) ([]uint8, error) {
+	imageValue, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
 	bounds := imageValue.Bounds()
+	// The test corpus is portrait tabletop footage. Ignore the presenter/banner
+	// above and the player's moving hand below; played cards appear in this ROI.
+	region := image.Rect(
+		bounds.Min.X+bounds.Dx()*18/100,
+		bounds.Min.Y+bounds.Dy()*40/100,
+		bounds.Min.X+bounds.Dx()*92/100,
+		bounds.Min.Y+bounds.Dy()*70/100,
+	)
+	return imageSignature(imageValue, region), nil
+}
+
+func imageSignature(imageValue image.Image, bounds image.Rectangle) []uint8 {
 	signature := make([]uint8, 16*16)
 	for y := 0; y < 16; y++ {
 		for x := 0; x < 16; x++ {
@@ -144,7 +164,7 @@ func frameSignature(data []byte) ([]uint8, error) {
 			signature[y*16+x] = uint8((299*r + 587*g + 114*b) / 1000 >> 8)
 		}
 	}
-	return signature, nil
+	return signature
 }
 
 func signatureDifference(previous, current []uint8) float64 {
