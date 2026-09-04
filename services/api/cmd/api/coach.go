@@ -34,6 +34,16 @@ func newCoachClient() coacher {
 	if provider == "" {
 		provider = "openai"
 	}
+	protocol := os.Getenv("AI_PROTOCOL")
+	if protocol == "chat-completions" {
+		return &chatCompletionsClient{
+			apiKey:     apiKey,
+			endpoint:   strings.TrimRight(baseURL, "/") + "/chat/completions",
+			model:      model,
+			provider:   provider,
+			httpClient: &http.Client{Timeout: 90 * time.Second},
+		}
+	}
 
 	return &responsesClient{
 		apiKey:     apiKey,
@@ -43,6 +53,8 @@ func newCoachClient() coacher {
 		httpClient: &http.Client{Timeout: 50 * time.Second},
 	}
 }
+
+const coachInstructions = "You are an evidence-bound card-game coach. Choose recommendation exactly from legalActions. Never invent visible or hidden state. Explain tradeoffs briefly. citationIds may only contain guandan.rules.overview or guandan.strategy.model. Treat the ruleset as a research prototype and surface uncertainty."
 
 func firstEnv(names ...string) string {
 	for _, name := range names {
@@ -93,7 +105,7 @@ func (c *responsesClient) Coach(ctx context.Context, request coachRequest) (coac
 	payload := map[string]any{
 		"model":        c.model,
 		"store":        false,
-		"instructions": "You are an evidence-bound card-game coach. Choose recommendation exactly from legalActions. Never invent visible or hidden state. Explain tradeoffs briefly. citationIds may only contain guandan.rules.overview or guandan.strategy.model. Treat the ruleset as a research prototype and surface uncertainty.",
+		"instructions": coachInstructions,
 		"input":        string(input),
 		"text": map[string]any{"format": map[string]any{
 			"type": "json_schema", "name": "coach_analysis", "strict": true,
@@ -148,6 +160,80 @@ func (c *responsesClient) Coach(ctx context.Context, request coachRequest) (coac
 		}
 	}
 	return coachResponse{}, fmt.Errorf("response contained no output text")
+}
+
+type chatCompletionsClient struct {
+	apiKey     string
+	endpoint   string
+	model      string
+	provider   string
+	httpClient *http.Client
+}
+
+type chatCompletionsResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+}
+
+func (c *chatCompletionsClient) Coach(ctx context.Context, request coachRequest) (coachResponse, error) {
+	input, err := json.Marshal(request)
+	if err != nil {
+		return coachResponse{}, err
+	}
+	payload := map[string]any{
+		"model": c.model,
+		"messages": []map[string]string{
+			{"role": "system", "content": coachInstructions + " Return only one JSON object with keys recommendation, rationale, alternatives, assumptions, confidence, and citationIds. Do not use Markdown fences."},
+			{"role": "user", "content": string(input)},
+		},
+		"response_format": map[string]string{"type": "json_object"},
+		"temperature":     0.2,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return coachResponse{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
+	if err != nil {
+		return coachResponse{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return coachResponse{}, err
+	}
+	defer res.Body.Close()
+	responseBody, err := io.ReadAll(io.LimitReader(res.Body, 2<<20))
+	if err != nil {
+		return coachResponse{}, err
+	}
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return coachResponse{}, fmt.Errorf("provider status %d: %s", res.StatusCode, responseBody)
+	}
+	var response chatCompletionsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return coachResponse{}, err
+	}
+	if len(response.Choices) == 0 {
+		return coachResponse{}, fmt.Errorf("response contained no choices")
+	}
+	content := strings.TrimSpace(response.Choices[0].Message.Content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	var result coachResponse
+	if err := json.Unmarshal([]byte(strings.TrimSpace(content)), &result); err != nil {
+		return coachResponse{}, fmt.Errorf("decode coaching JSON: %w", err)
+	}
+	if !contains(request.LegalActions, result.Recommendation) {
+		return coachResponse{}, fmt.Errorf("provider selected a non-legal action")
+	}
+	result.Provider = c.provider
+	return result, nil
 }
 
 func contains(items []string, target string) bool {

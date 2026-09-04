@@ -41,10 +41,11 @@ Copy `.env.example` to `.env`, set `AI_API_KEY`, then export those values only
 in the Go API process. Without a key, the same workflow runs in clearly labeled
 demo mode. Never place an API key in `NEXT_PUBLIC_*` variables or commit `.env`.
 
-Set `AI_BASE_URL`, `AI_MODEL`, and `AI_PROVIDER` to switch to another provider that
-implements the OpenAI Responses API. The conventional `OPENAI_API_KEY`,
+Set `AI_BASE_URL`, `AI_MODEL`, `AI_PROVIDER`, and `AI_PROTOCOL` to switch providers.
+Supported protocols are `responses` and `chat-completions`. The conventional `OPENAI_API_KEY`,
 `OPENAI_MODEL`, and `OPENAI_BASE_URL` names remain supported as aliases. A provider
-that only supports Chat Completions requires a separate protocol adapter.
+using Chat Completions should request JSON output; the server still rejects any
+recommendation that is not present in the submitted legal-action list.
 
 The current vertical slice submits a 掼蛋 position and a deterministic list of
 legal actions to `POST /v1/coach`. OpenAI Structured Outputs return the selected

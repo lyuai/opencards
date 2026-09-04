@@ -40,7 +40,7 @@ func TestDemoCoachUsesLegalAction(t *testing.T) {
 }
 
 func TestProviderConfiguration(t *testing.T) {
-	for _, name := range []string{"AI_API_KEY", "OPENAI_API_KEY", "AI_BASE_URL", "OPENAI_BASE_URL", "AI_MODEL", "OPENAI_MODEL", "AI_PROVIDER"} {
+	for _, name := range []string{"AI_API_KEY", "OPENAI_API_KEY", "AI_BASE_URL", "OPENAI_BASE_URL", "AI_MODEL", "OPENAI_MODEL", "AI_PROVIDER", "AI_PROTOCOL"} {
 		t.Setenv(name, "")
 	}
 	t.Setenv("AI_API_KEY", "test-key")
@@ -60,5 +60,20 @@ func TestProviderConfiguration(t *testing.T) {
 	}
 	if os.Getenv("AI_API_KEY") != "test-key" {
 		t.Fatal("test environment changed unexpectedly")
+	}
+}
+
+func TestChatCompletionsConfiguration(t *testing.T) {
+	t.Setenv("AI_API_KEY", "test-key")
+	t.Setenv("AI_BASE_URL", "https://provider.example/v1/")
+	t.Setenv("AI_MODEL", "provider-model")
+	t.Setenv("AI_PROVIDER", "example")
+	t.Setenv("AI_PROTOCOL", "chat-completions")
+	client, ok := newCoachClient().(*chatCompletionsClient)
+	if !ok {
+		t.Fatal("expected Chat Completions client")
+	}
+	if client.endpoint != "https://provider.example/v1/chat/completions" {
+		t.Fatalf("endpoint = %q", client.endpoint)
 	}
 }
