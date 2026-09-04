@@ -1,12 +1,9 @@
-.godot/
-.superpowers/
-*.import
-*.translation
-*.uid
-
-# Godot editor metadata is generated locally.
-builds/
-.worktrees/
-
-# Keep non-secret export preset defaults in source control.
-!export_presets.cfg
+.DS_Store
+.env
+.env.local
+.next/
+node_modules/
+dist/
+coverage/
+bin/
+*.log

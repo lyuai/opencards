@@ -1,0 +1,10 @@
+{
+  "name": "opencards",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "dev": "pnpm --filter @opencards/web dev",
+    "build": "pnpm --filter @opencards/web build",
+    "lint": "pnpm --filter @opencards/web lint"
+  }
+}
