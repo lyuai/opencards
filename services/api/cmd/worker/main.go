@@ -85,6 +85,7 @@ func process(api, workerID string, item *job, coordinator *captureCoordinator) {
 		}
 	}
 	_ = post(api+"/v1/jobs/"+item.ID+"/heartbeat", map[string]any{"workerId": workerID, "stage": "recognizing", "progress": .65, "message": fmt.Sprintf("Preparing %d table-change candidates", len(capture.Observations))}, nil)
+	stable := stableCandidates(capture.Observations, 3*time.Second)
 	sourceID := item.Source.URL
 	if marker := strings.Index(sourceID, "BV"); marker >= 0 {
 		sourceID = strings.FieldsFunc(sourceID[marker:], func(r rune) bool { return r == '/' || r == '?' })[0]
@@ -96,8 +97,14 @@ func process(api, workerID string, item *job, coordinator *captureCoordinator) {
 		"message":             fmt.Sprintf("Captured %d timestamped observations. Replay events require vision and rules validation.", len(capture.Observations)),
 		"recognitionStrategy": "table-roi-change-detection",
 		"observations":        capture.Observations,
-		"evidenceDirectory":   capture.Directory,
-		"events":              []any{},
+		"stableCandidates":    stable,
+		"metrics": map[string]any{
+			"changedFrames":  len(capture.Observations),
+			"stableFrames":   len(stable),
+			"paidModelCalls": 0,
+		},
+		"evidenceDirectory": capture.Directory,
+		"events":            []any{},
 	}
 	if err := post(api+"/v1/jobs/"+item.ID+"/complete", map[string]any{"workerId": workerID, "result": result}, nil); err != nil {
 		log.Printf("complete %s: %v", item.ID, err)
