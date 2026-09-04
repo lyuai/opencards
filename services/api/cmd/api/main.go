@@ -48,6 +48,7 @@ type feedbackStore struct {
 func main() {
 	mux := http.NewServeMux()
 	feedback := &feedbackStore{}
+	games := newGameStore()
 	client := newCoachClient()
 	dataDirectory := os.Getenv("OPENCARDS_DATA_DIR")
 	if dataDirectory == "" {
@@ -72,7 +73,24 @@ func main() {
 			writeError(w, http.StatusInternalServerError, "could not shuffle deck")
 			return
 		}
-		writeJSON(w, http.StatusCreated, deal.viewFor("south"))
+		session := games.create(deal)
+		writeJSON(w, http.StatusCreated, session.view())
+	})
+	mux.HandleFunc("POST /v1/games/guandan/deals/{id}/actions", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			CardIDs []string `json:"cardIds"`
+			Pass    bool     `json:"pass"`
+		}
+		if err := decodeJSON(r, &request); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid action")
+			return
+		}
+		view, err := games.act(r.PathValue("id"), "south", request.CardIDs, request.Pass)
+		if err != nil {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
 	})
 	mux.HandleFunc("POST /v1/imports", func(w http.ResponseWriter, r *http.Request) {
 		var request importRequest

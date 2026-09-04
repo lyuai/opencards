@@ -47,10 +47,13 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .tableCenter { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); display: grid; gap: 5px; text-align: center; }
 .tableCenter b { font-size: 18px; }
 .tableCenter span { color: #a9c4b4; font-size: 12px; }
+.centerCards { max-width: 310px; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.centerCards span { min-width: 34px; padding: 7px 5px; border-radius: 4px; background: #f5f3ed; color: #171a17; font: 700 12px Georgia, serif; }
 .player { position: absolute; display: grid; gap: 2px; min-width: 110px; padding: 8px 10px; border-radius: 8px; background: #163d2b; border: 1px solid #48765e; text-align: center; }
 .player b { font-size: 12px; }
 .player span { color: #a9c4b4; font-size: 10px; }
 .player em { margin-top: 3px; color: #e0b756; font-size: 9px; font-style: normal; }
+.player.activePlayer { border-color: #e0b756; box-shadow: 0 0 0 2px #e0b75633; }
 .north { top: 14px; left: 50%; transform: translateX(-50%); }
 .south { bottom: 14px; left: 50%; transform: translateX(-50%); }
 .west { left: 14px; top: 50%; transform: translateY(-50%); }
@@ -73,13 +76,17 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .playedCards { min-width: 0; justify-self: end; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
 .playedCards span { min-width: 30px; padding: 5px 4px; border-radius: 4px; background: #f5f3ed; color: #171a17; font: 700 11px Georgia, serif; text-align: center; }
 .playedCards span.red { color: #b42d2d; }
+.actionLog { max-height: 300px; display: grid; gap: 5px; overflow-y: auto; }
+.logRow { min-height: 42px; padding: 6px 8px; display: grid; grid-template-columns: 34px 70px 90px 1fr; align-items: center; gap: 7px; border-radius: 6px; background: #1d241f; font-size: 10px; }
+.logRow > span { color: #768179; }
+.logRow > em, .logRow > i { color: #d9ad49; font-style: normal; text-transform: capitalize; }
 .hand { min-height: 124px; margin-top: 16px; display: flex; align-items: flex-end; justify-content: center; gap: 0; overflow-x: auto; padding: 8px 34px; }
 .handLabel { margin-top: 15px; display: flex; align-items: baseline; justify-content: space-between; }
 .handLabel b { font-size: 12px; }
 .playingCard { position: relative; flex: 0 0 70px; width: 70px; height: 104px; margin-left: -42px; padding: 9px; display: grid; align-content: start; justify-items: start; border-radius: 7px; border: 2px solid transparent; background: #f5f3ed; color: #161916; box-shadow: -2px 0 5px #10141155; transition: transform .12s, border-color .12s; }
 .playingCard:first-child { margin-left: 0; }
-.playingCard:hover { z-index: 2; transform: translateY(-3px); }
-.playingCard[aria-pressed="true"] { z-index: 3; transform: translateY(-7px); border-color: #e0ad3f; }
+.playingCard:hover { transform: translateY(-3px); }
+.playingCard[aria-pressed="true"] { transform: translateY(-7px); border-color: #e0ad3f; }
 .playingCard span { font: 700 20px Georgia, serif; line-height: 1; }
 .playingCard i { font-style: normal; font-size: 17px; }
 .playingCard.red { color: #b42d2d; }
@@ -91,6 +98,13 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .playOptions button.chosen { border-color: #d7a83f; background: #332b19; color: #f2dfb3; }
 .primary { min-width: 120px; padding: 10px 15px; border: 0; border-radius: 7px; background: #d8aa43; color: #1c180f; font-weight: 750; }
 .primary:disabled { opacity: .45; cursor: default; }
+.secondary { padding: 9px 13px; border: 1px solid #46534b; border-radius: 7px; background: transparent; color: #dce2de; font-weight: 650; }
+.secondary:disabled { opacity: .35; cursor: default; }
+.playControls { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
+.coachHint { margin-top: 12px; padding: 11px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #4d4228; border-radius: 8px; background: #211e16; }
+.coachHint > div { display: grid; gap: 3px; }
+.coachHint b { color: #e1b552; font-size: 11px; }
+.coachHint span { color: #b8b09c; font-size: 10px; }
 .dealNotice { margin-top: 12px; padding: 10px 12px; display: flex; justify-content: space-between; gap: 12px; border-radius: 7px; background: #141915; }
 .dealNotice b { color: #d8aa43; font-size: 11px; }
 .error { margin: 12px 0 0; color: #ff958b; font-size: 12px; }
