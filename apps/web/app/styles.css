@@ -107,6 +107,10 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .secondary { padding: 9px 13px; border: 1px solid #46534b; border-radius: 7px; background: transparent; color: #dce2de; font-weight: 650; }
 .secondary:disabled { opacity: .35; cursor: default; }
 .playControls { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
+.coachRequest { margin-top: 12px; padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-radius: 8px; background: #18201b; border: 1px solid #344139; }
+.coachRequest > div { display: grid; gap: 3px; }
+.coachRequest b { font-size: 12px; }
+.coachRequest span { color: #98a29c; font-size: 10px; }
 .coachHint { margin-top: 12px; padding: 14px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 18px; border: 1px solid #6b5628; border-radius: 8px; background: #211e16; }
 .coachAdvice { display: grid; gap: 7px; }
 .coachHint b { color: #e1b552; font-size: 11px; }

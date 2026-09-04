@@ -6,12 +6,12 @@ import { useCallback, useEffect, useState } from "react";
 type Card = { id: string; rank: string; suit: string };
 type Combo = { type: string; size: number; power: number };
 type Action = { index: number; seat: string; kind: "play" | "pass"; cards?: Card[]; combination?: Combo };
-type Coach = { available: boolean; action?: "play" | "pass"; cardIds?: string[]; combination?: Combo; reason?: string };
+type AIAdvice = { provider: string; recommendation: string; cardIds: string[]; combination?: Combo; rationale: string; alternatives: string[]; assumptions: string[]; confidence: number };
 type Game = {
   id: string; game: "guandan"; levelRank: string; yourSeat: "south"; yourHand: Card[];
   counts: Record<"south" | "west" | "north" | "east", number>;
   turn: "south" | "west" | "north" | "east"; currentPlay?: Action;
-  history: Action[]; finished: string[]; gameOver: boolean; coach: Coach; createdAt: string;
+  history: Action[]; finished: string[]; gameOver: boolean; createdAt: string;
 };
 
 const seats = [
@@ -25,10 +25,12 @@ export function CoachLab() {
   const [game, setGame] = useState<Game | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [aiAdvice, setAIAdvice] = useState<AIAdvice | null>(null);
   const [error, setError] = useState("");
 
   const dealCards = useCallback(async () => {
-    setLoading(true); setError(""); setSelected([]);
+    setLoading(true); setError(""); setSelected([]); setAIAdvice(null);
     try {
       const response = await fetch(`${api}/v1/games/guandan/deals`, { method: "POST" });
       const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Could not deal cards"); setGame(body);
@@ -43,13 +45,22 @@ export function CoachLab() {
       const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardIds: pass ? [] : cards, pass }) });
       const body = await response.json();
       if (response.status === 404 && body.error === "game not found") { await dealCards(); setError("The previous game expired after a server restart, so a new hand was dealt."); return; }
-      if (!response.ok) throw new Error(body.error ?? "Illegal action"); setGame(body); setSelected([]);
+      if (!response.ok) throw new Error(body.error ?? "Illegal action"); setGame(body); setSelected([]); setAIAdvice(null);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Illegal action"); }
     finally { setLoading(false); }
   }
 
+  async function askAICoach() {
+    if (!game) return; setCoachLoading(true); setError("");
+    try {
+      const response=await fetch(`${api}/v1/games/guandan/deals/${game.id}/coach`,{method:"POST"});
+      const body=await response.json(); if(!response.ok) throw new Error(body.error??"AI coach unavailable"); setAIAdvice(body);
+    } catch(caught){setError(caught instanceof Error?caught.message:"AI coach unavailable");}
+    finally{setCoachLoading(false);}
+  }
+
   const yourTurn = game?.turn === "south" && !game.gameOver;
-  const coachCards = game?.coach.cardIds?.map((id) => game.yourHand.find((card) => card.id === id)).filter((card): card is Card => Boolean(card)) ?? [];
+  const coachCards = aiAdvice?.cardIds.map((id) => game?.yourHand.find((card) => card.id === id)).filter((card): card is Card => Boolean(card)) ?? [];
   return <main>
     <header><b>OpenCards</b><nav><Link className="active" href="/">Play</Link><Link href="/training">Training</Link></nav><span>掼蛋 · 打{game?.levelRank ?? "2"} · {game?.id ?? "Preparing table"}</span></header>
     <div className="playWorkspace">
@@ -61,12 +72,13 @@ export function CoachLab() {
           <div className="tableCenter"><b>{game?.currentPlay ? comboLabel(game.currentPlay.combination?.type) : "Lead any legal play"}</b><div className="centerCards">{game?.currentPlay?.cards?.map((card) => <MiniCard card={card} key={card.id}/>)}</div><span>{game?.currentPlay ? `${seatLabels[game.currentPlay.seat]} played` : "Fresh trick"}</span></div>
         </div>
         <div className="handLabel"><b>Your hand</b><span>{game?.yourHand.length ?? 0} cards · {selected.length} selected</span></div>
-        <div className="hand" aria-label="Your hand">{game?.yourHand.map((card) => <CardButton card={card} wild={card.rank === game.levelRank && card.suit === "♥"} recommended={game.coach.cardIds?.includes(card.id) ?? false} selected={selected.includes(card.id)} key={card.id} onClick={() => yourTurn && setSelected((current) => current.includes(card.id) ? current.filter((id) => id !== card.id) : [...current, card.id])}/>)}</div>
+        <div className="hand" aria-label="Your hand">{game?.yourHand.map((card) => <CardButton card={card} wild={card.rank === game.levelRank && card.suit === "♥"} recommended={aiAdvice?.cardIds.includes(card.id) ?? false} selected={selected.includes(card.id)} key={card.id} onClick={() => yourTurn && setSelected((current) => current.includes(card.id) ? current.filter((id) => id !== card.id) : [...current, card.id])}/>)}</div>
         <div className="playControls">
           <button className="secondary" disabled={!yourTurn || loading || !game?.currentPlay} onClick={() => void act(true)}>Pass</button>
           <button className="primary" disabled={!yourTurn || loading || selected.length === 0} onClick={() => void act(false)}>{loading ? "Playing…" : "Play selected"}</button>
         </div>
-        {game?.coach.available && <div className="coachHint"><div className="coachAdvice"><b>AI 教练建议</b><h3>{game.coach.action === "pass" ? "不出" : `出 ${coachCards.map(cardText).join(" ")} · ${comboLabel(game.coach.combination?.type)}`}</h3><div className="recommendedCards">{coachCards.map((card) => <MiniCard card={card} key={card.id}/>)}</div><span>{game.coach.reason}</span><small>黄色虚线标出了建议牌；你仍可以选择其他合法出法。</small></div><div className="coachButtons">{game.coach.action === "pass" ? <button className="primary" onClick={() => void act(true)}>按建议不出</button> : <><button className="secondary" onClick={() => setSelected(game.coach.cardIds ?? [])}>选中建议牌</button><button className="primary" onClick={() => void act(false, game.coach.cardIds ?? [])}>按建议出牌</button></>}</div></div>}
+        <div className="coachRequest"><div><b>真正的 AI 教练</b><span>模型会比较规则引擎生成的合法候选，并结合队友、对手牌数和完整历史给建议。</span></div><button className="primary" disabled={!yourTurn||coachLoading} onClick={()=>void askAICoach()}>{coachLoading?"AI 分析中…":"咨询 AI 教练"}</button></div>
+        {aiAdvice && <div className="coachHint"><div className="coachAdvice"><b>AI 教练 · {aiAdvice.provider} · {Math.round(aiAdvice.confidence*100)}%</b><h3>{aiAdvice.cardIds.length===0?"建议不出":`建议出 ${coachCards.map(cardText).join(" ")} · ${comboLabel(aiAdvice.combination?.type)}`}</h3><div className="recommendedCards">{coachCards.map((card)=><MiniCard card={card} key={card.id}/>)}</div><span>{aiAdvice.rationale}</span><small>模型只能从规则引擎验证过的候选中选择，不允许编造牌。</small></div><div className="coachButtons">{aiAdvice.cardIds.length===0?<button className="primary" onClick={()=>void act(true)}>按建议不出</button>:<><button className="secondary" onClick={()=>setSelected(aiAdvice.cardIds)}>选中建议牌</button><button className="primary" onClick={()=>void act(false,aiAdvice.cardIds)}>按建议出牌</button></>}</div></div>}
         {error && <p className="error">{error}</p>}
         <section className="history" aria-label="Complete play history"><div className="historyTitle"><b>出牌记录 <em>从早到晚</em></b><span>{game?.history.length ?? 0} 次行动</span></div><div className="actionLog">{game?.history.map((action) => <div className="logRow" key={action.index}><span>#{action.index}</span><b>{seatLabels[action.seat]}</b>{action.kind === "pass" ? <i>不出</i> : <><em>{comboLabel(action.combination?.type)}</em><div className="playedCards">{action.cards?.map((card) => <MiniCard card={card} key={card.id}/>)}</div></>}</div>)}</div></section>
       </section>

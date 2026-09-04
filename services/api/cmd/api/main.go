@@ -104,6 +104,35 @@ func main() {
 		}
 		writeJSON(w, http.StatusOK, view)
 	})
+	mux.HandleFunc("POST /v1/games/guandan/deals/{id}/coach", func(w http.ResponseWriter, r *http.Request) {
+		request, choices, err := games.coachingRequest(r.PathValue("id"))
+		if err != nil {
+			if errors.Is(err, errGameNotFound) {
+				writeError(w, http.StatusNotFound, err.Error())
+			} else {
+				writeError(w, http.StatusConflict, err.Error())
+			}
+			return
+		}
+		if _, demo := client.(demoCoach); demo {
+			writeError(w, http.StatusServiceUnavailable, "real AI provider is not configured")
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+		defer cancel()
+		result, err := client.Coach(ctx, request)
+		if err != nil {
+			log.Printf("game coach: %v", err)
+			writeError(w, http.StatusBadGateway, "AI coach provider unavailable")
+			return
+		}
+		choice, ok := choices[result.Recommendation]
+		if !ok {
+			writeError(w, http.StatusBadGateway, "AI selected an invalid action")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"provider": result.Provider, "recommendation": result.Recommendation, "cardIds": choice.CardIDs, "combination": choice.Combo, "rationale": result.Rationale, "alternatives": result.Alternatives, "assumptions": result.Assumptions, "confidence": result.Confidence})
+	})
 	mux.HandleFunc("POST /v1/imports", func(w http.ResponseWriter, r *http.Request) {
 		var request importRequest
 		if err := decodeJSON(r, &request); err != nil || request.Game == "" || request.Source.Provider == "" || request.Source.URL == "" {
