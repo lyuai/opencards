@@ -66,6 +66,14 @@ func main() {
 			{ID: "kards", Name: "KARDS", Status: "planned"},
 		}})
 	})
+	mux.HandleFunc("POST /v1/games/guandan/deals", func(w http.ResponseWriter, _ *http.Request) {
+		deal, err := newGuandanDeal()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "could not shuffle deck")
+			return
+		}
+		writeJSON(w, http.StatusCreated, deal.viewFor("south"))
+	})
 	mux.HandleFunc("POST /v1/imports", func(w http.ResponseWriter, r *http.Request) {
 		var request importRequest
 		if err := decodeJSON(r, &request); err != nil || request.Game == "" || request.Source.Provider == "" || request.Source.URL == "" {
