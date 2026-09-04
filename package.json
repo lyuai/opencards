@@ -5,6 +5,6 @@
   "scripts": {
     "dev": "pnpm --filter @opencards/web dev",
     "build": "pnpm --filter @opencards/web build",
-    "lint": "pnpm --filter @opencards/web lint"
+    "typecheck": "pnpm --filter @opencards/web typecheck"
   }
 }

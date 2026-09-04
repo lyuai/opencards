@@ -3,6 +3,8 @@
 .env.local
 .next/
 node_modules/
+.pnpm-store/
+*.tsbuildinfo
 dist/
 coverage/
 bin/
