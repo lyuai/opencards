@@ -175,7 +175,7 @@ func (session *gameSession) view() map[string]any {
 		counts[seat] = len(session.Hands[seat])
 	}
 	coach := coachHint(session)
-	return map[string]any{"id": session.ID, "game": "guandan", "yourSeat": "south", "yourHand": session.Hands["south"], "counts": counts, "turn": session.seat(), "currentPlay": session.Current, "history": session.History, "finished": session.Finished, "gameOver": session.over(), "coach": coach, "createdAt": session.CreatedAt}
+	return map[string]any{"id": session.ID, "game": "guandan", "levelRank": "2", "yourSeat": "south", "yourHand": session.Hands["south"], "counts": counts, "turn": session.seat(), "currentPlay": session.Current, "history": session.History, "finished": session.Finished, "gameOver": session.over(), "coach": coach, "createdAt": session.CreatedAt}
 }
 
 func coachHint(session *gameSession) map[string]any {

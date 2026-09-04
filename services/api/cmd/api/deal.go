@@ -34,7 +34,8 @@ type guandanDealView struct {
 	CreatedAt time.Time      `json:"createdAt"`
 }
 
-var seatOrder = []string{"south", "west", "north", "east"}
+// Play proceeds counter-clockwise around the table.
+var seatOrder = []string{"south", "east", "north", "west"}
 var suitOrder = map[string]int{"♣": 0, "♦": 1, "♥": 2, "♠": 3, "★": 4}
 var rankOrder = map[string]int{"3": 0, "4": 1, "5": 2, "6": 3, "7": 4, "8": 5, "9": 6, "10": 7, "J": 8, "Q": 9, "K": 10, "A": 11, "2": 12, "SJ": 13, "BJ": 14}
 

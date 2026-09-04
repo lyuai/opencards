@@ -4,7 +4,8 @@ game: guandan
 kind: rule
 ruleset: competition-draft-2026-09
 status: draft
-sources: []
+sources:
+  - https://www.ttbz.org.cn/upload/file/20191223/6371270213033087899544901.pdf
 reviewed_by: []
 updated: 2026-09-04
 ---
@@ -21,6 +22,23 @@ Four players form two fixed partnerships, with partners seated opposite. Play
 normally uses two standard 54-card decks. A hand combines shedding/climbing play
 with a level rank that changes the strength of designated cards. The immediate
 goal is to empty one's hand; partnership finishing order determines progression.
+
+Play proceeds counter-clockwise. With the player shown at South, the order is
+South → East → North → West.
+
+## Level rank and wild cards
+
+A match starts at level 2 and progresses through A. The current level is commonly
+described as “打几”; all eight cards whose rank equals that level are level cards.
+For single-card and same-rank comparisons the order is big joker > small joker >
+level card > A > K > … > 3 > 2, with the current level removed from its ordinary
+position.
+
+The two heart-suit level cards are 红心级牌, also called 红心参谋、逢人配 or
+万能牌. Each may represent another ordinary rank/suit as needed to form a legal
+combination, but may not represent a small or big joker. Wild-card substitutions
+must be recorded explicitly in an executable play so comparison and replay remain
+deterministic.
 
 ## What the executable ruleset must define
 
