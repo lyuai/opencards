@@ -35,6 +35,18 @@ go run ./cmd/api
 Then open <http://localhost:3000>. The API listens on
 <http://localhost:8080>; `GET /healthz` and `GET /v1/games` are available.
 
+## AI coaching prototype
+
+Copy `.env.example` to `.env`, set `OPENAI_API_KEY`, then export those values only
+in the Go API process. Without a key, the same workflow runs in clearly labeled
+demo mode. Never place an API key in `NEXT_PUBLIC_*` variables or commit `.env`.
+
+The current vertical slice submits a 掼蛋 position and a deterministic list of
+legal actions to `POST /v1/coach`. OpenAI Structured Outputs return the selected
+action, rationale, assumptions, confidence, and knowledge IDs. The backend rejects
+recommendations outside the supplied legal-action list. Corrections sent through
+`POST /v1/feedback` enter a review queue rather than changing strategy directly.
+
 ## Product principles
 
 - Deterministic game engines decide legality; language models explain decisions.

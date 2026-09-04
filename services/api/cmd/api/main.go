@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -14,8 +17,15 @@ type game struct {
 	Status string `json:"status"`
 }
 
+type coachRequest struct { Game string `json:"game"`; Ruleset string `json:"ruleset"`; Position string `json:"position"`; LegalActions []string `json:"legalActions"`; PlayerGoal string `json:"playerGoal"` }
+type coachResponse struct { Recommendation string `json:"recommendation"`; Rationale string `json:"rationale"`; Alternatives []string `json:"alternatives"`; Assumptions []string `json:"assumptions"`; Confidence float64 `json:"confidence"`; CitationIDs []string `json:"citationIds"`; Provider string `json:"provider"` }
+type feedbackRequest struct { RecommendationID string `json:"recommendationId"`; Verdict string `json:"verdict"`; Comment string `json:"comment"`; SuggestedAction string `json:"suggestedAction"` }
+type feedbackStore struct { mu sync.Mutex; items []feedbackRequest }
+
 func main() {
 	mux := http.NewServeMux()
+	feedback := &feedbackStore{}
+	client := newCoachClient()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -25,13 +35,40 @@ func main() {
 			{ID: "kards", Name: "KARDS", Status: "planned"},
 		}})
 	})
+	mux.HandleFunc("POST /v1/coach", func(w http.ResponseWriter, r *http.Request) {
+		var request coachRequest
+		if err := decodeJSON(r, &request); err != nil { writeError(w, http.StatusBadRequest, err.Error()); return }
+		if err := validateCoachRequest(request); err != nil { writeError(w, http.StatusUnprocessableEntity, err.Error()); return }
+		ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second); defer cancel()
+		result, err := client.Coach(ctx, request)
+		if err != nil { log.Printf("coach: %v", err); writeError(w, http.StatusBadGateway, "coach provider unavailable"); return }
+		writeJSON(w, http.StatusOK, map[string]any{"id": "coach-" + time.Now().UTC().Format("20060102T150405.000000000"), "result": result})
+	})
+	mux.HandleFunc("POST /v1/feedback", func(w http.ResponseWriter, r *http.Request) {
+		var request feedbackRequest
+		if err := decodeJSON(r, &request); err != nil || request.RecommendationID == "" || request.Comment == "" { writeError(w, http.StatusBadRequest, "recommendationId and comment are required"); return }
+		feedback.mu.Lock(); feedback.items = append(feedback.items, request); feedback.mu.Unlock()
+		writeJSON(w, http.StatusAccepted, map[string]string{"status": "queued_for_review"})
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" { port = "8080" }
-	server := &http.Server{Addr: ":" + port, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{Addr: ":" + port, Handler: cors(mux), ReadHeaderTimeout: 5 * time.Second}
 	log.Printf("OpenCards API listening on %s", server.Addr)
 	log.Fatal(server.ListenAndServe())
 }
+
+func decodeJSON(r *http.Request, target any) error { decoder := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20)); decoder.DisallowUnknownFields(); return decoder.Decode(target) }
+func validateCoachRequest(request coachRequest) error {
+	if request.Game == "" || request.Ruleset == "" || strings.TrimSpace(request.Position) == "" { return &validationError{"game, ruleset, and position are required"} }
+	if len(request.LegalActions) < 2 || len(request.LegalActions) > 20 { return &validationError{"provide between 2 and 20 legal actions"} }
+	for _, action := range request.LegalActions { if strings.TrimSpace(action) == "" { return &validationError{"legal actions cannot be empty"} } }
+	return nil
+}
+type validationError struct{ message string }
+func (e *validationError) Error() string { return e.message }
+func writeError(w http.ResponseWriter, status int, message string) { writeJSON(w, status, map[string]string{"error": message}) }
+func cors(next http.Handler) http.Handler { return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { origin := os.Getenv("WEB_ORIGIN"); if origin == "" { origin = "http://localhost:3000" }; w.Header().Set("Access-Control-Allow-Origin", origin); w.Header().Set("Access-Control-Allow-Headers", "Content-Type"); w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS"); if r.Method == http.MethodOptions { w.WriteHeader(http.StatusNoContent); return }; next.ServeHTTP(w, r) }) }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
