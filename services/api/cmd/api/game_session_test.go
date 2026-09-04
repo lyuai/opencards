@@ -7,8 +7,14 @@ func TestHumanPlayRunsAIUntilHumanTurn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := newGameStore()
-	session := store.create(deal)
+	store, err := newGameStore(t.TempDir() + "/games.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.create(deal)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cardID := session.Hands["south"][0].ID
 	view, err := store.act(session.ID, "south", []string{cardID}, false)
 	if err != nil {
@@ -27,9 +33,26 @@ func TestHumanPlayRunsAIUntilHumanTurn(t *testing.T) {
 
 func TestCannotPassWhenLeading(t *testing.T) {
 	deal, _ := newGuandanDeal()
-	store := newGameStore()
-	session := store.create(deal)
+	store, _ := newGameStore(t.TempDir() + "/games.json")
+	session, _ := store.create(deal)
 	if _, err := store.act(session.ID, "south", nil, true); err == nil {
 		t.Fatal("expected leading pass error")
+	}
+}
+
+func TestGameSurvivesStoreRestart(t *testing.T) {
+	path := t.TempDir() + "/games.json"
+	store, _ := newGameStore(path)
+	deal, _ := newGuandanDeal()
+	session, err := store.create(deal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := newGameStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.sessions[session.ID] == nil || len(reloaded.sessions[session.ID].Hands["south"]) != 27 {
+		t.Fatal("persisted game was not restored")
 	}
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -48,7 +49,6 @@ type feedbackStore struct {
 func main() {
 	mux := http.NewServeMux()
 	feedback := &feedbackStore{}
-	games := newGameStore()
 	client := newCoachClient()
 	dataDirectory := os.Getenv("OPENCARDS_DATA_DIR")
 	if dataDirectory == "" {
@@ -57,6 +57,10 @@ func main() {
 	jobs, err := newJobStore(filepath.Join(dataDirectory, "jobs.json"))
 	if err != nil {
 		log.Fatalf("open job store: %v", err)
+	}
+	games, err := newGameStore(filepath.Join(dataDirectory, "games.json"))
+	if err != nil {
+		log.Fatalf("open game store: %v", err)
 	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -73,7 +77,11 @@ func main() {
 			writeError(w, http.StatusInternalServerError, "could not shuffle deck")
 			return
 		}
-		session := games.create(deal)
+		session, err := games.create(deal)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "could not persist game")
+			return
+		}
 		writeJSON(w, http.StatusCreated, session.view())
 	})
 	mux.HandleFunc("POST /v1/games/guandan/deals/{id}/actions", func(w http.ResponseWriter, r *http.Request) {
@@ -87,6 +95,10 @@ func main() {
 		}
 		view, err := games.act(r.PathValue("id"), "south", request.CardIDs, request.Pass)
 		if err != nil {
+			if errors.Is(err, errGameNotFound) {
+				writeError(w, http.StatusNotFound, err.Error())
+				return
+			}
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}

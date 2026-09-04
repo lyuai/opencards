@@ -41,7 +41,9 @@ export function CoachLab() {
     if (!game) return; setLoading(true); setError("");
     try {
       const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardIds: pass ? [] : selected, pass }) });
-      const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Illegal action"); setGame(body); setSelected([]);
+      const body = await response.json();
+      if (response.status === 404 && body.error === "game not found") { await dealCards(); setError("The previous game expired after a server restart, so a new hand was dealt."); return; }
+      if (!response.ok) throw new Error(body.error ?? "Illegal action"); setGame(body); setSelected([]);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Illegal action"); }
     finally { setLoading(false); }
   }

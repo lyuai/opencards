@@ -1,7 +1,11 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -29,16 +33,36 @@ type gameSession struct {
 type gameStore struct {
 	mu       sync.Mutex
 	sessions map[string]*gameSession
+	path     string
 }
 
-func newGameStore() *gameStore { return &gameStore{sessions: map[string]*gameSession{}} }
+var errGameNotFound = errors.New("game not found")
 
-func (store *gameStore) create(deal guandanDeal) *gameSession {
+func newGameStore(path string) (*gameStore, error) {
+	store := &gameStore{sessions: map[string]*gameSession{}, path: path}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return store, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &store.sessions); err != nil {
+		return nil, err
+	}
+	return store, nil
+}
+
+func (store *gameStore) create(deal guandanDeal) (*gameSession, error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	session := &gameSession{ID: deal.ID, Hands: deal.Hands, History: []gameAction{}, Finished: []string{}, CreatedAt: deal.CreatedAt}
 	store.sessions[session.ID] = session
-	return session
+	if err := store.persistLocked(); err != nil {
+		delete(store.sessions, session.ID)
+		return nil, err
+	}
+	return session, nil
 }
 
 func (store *gameStore) act(id, seat string, cardIDs []string, pass bool) (map[string]any, error) {
@@ -46,7 +70,7 @@ func (store *gameStore) act(id, seat string, cardIDs []string, pass bool) (map[s
 	defer store.mu.Unlock()
 	session, ok := store.sessions[id]
 	if !ok {
-		return nil, fmt.Errorf("game not found")
+		return nil, errGameNotFound
 	}
 	if session.seat() != seat {
 		return nil, fmt.Errorf("it is %s's turn", session.seat())
@@ -59,7 +83,25 @@ func (store *gameStore) act(id, seat string, cardIDs []string, pass bool) (map[s
 		choice := chooseAIPlay(session.Hands[aiSeat], session.Current, aiSeat == "north")
 		_ = session.apply(aiSeat, idsOf(choice), len(choice) == 0)
 	}
+	if err := store.persistLocked(); err != nil {
+		return nil, err
+	}
 	return session.view(), nil
+}
+
+func (store *gameStore) persistLocked() error {
+	if err := os.MkdirAll(filepath.Dir(store.path), 0o700); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(store.sessions, "", "  ")
+	if err != nil {
+		return err
+	}
+	temporary := store.path + ".tmp"
+	if err := os.WriteFile(temporary, data, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(temporary, store.path)
 }
 
 func (session *gameSession) apply(seat string, cardIDs []string, pass bool) error {
