@@ -6,6 +6,8 @@ type CoachResult = { recommendation: string; rationale: string; alternatives: st
 type Card = { id: string; rank: string; suit: string; red?: boolean; joker?: boolean };
 type LegalPlay = { label: string; cards: string[] };
 type Turn = { player: string; cards?: Card[]; note?: string };
+type Trick = { number: number; winner: string; turns: Turn[] };
+type PlayerStyle = { label: string; evidence: string };
 
 const hand: Card[] = [
   { id: "3s", rank: "3", suit: "♠" }, { id: "3h", rank: "3", suit: "♥", red: true },
@@ -22,15 +24,39 @@ const plays: LegalPlay[] = [
   { label: "Play single A", cards: ["as"] },
   { label: "Play black joker", cards: ["bj"] },
 ];
-const playHistory: Turn[] = [
-  { player: "West", cards: [{ id: "w4s", rank: "4", suit: "♠" }, { id: "w4h", rank: "4", suit: "♥", red: true }] },
-  { player: "Partner", cards: [{ id: "p6c", rank: "6", suit: "♣" }, { id: "p6d", rank: "6", suit: "♦", red: true }], note: "Won trick" },
-  { player: "East" },
-  { player: "You" },
+const playHistory: Trick[] = [
+  { number: 1, winner: "East", turns: [
+    { player: "You", cards: cards("y5s", "5♠") }, { player: "West", cards: cards("w8c", "8♣") },
+    { player: "Partner" }, { player: "East", cards: cards("eas", "A♠") },
+  ] },
+  { number: 2, winner: "Partner", turns: [
+    { player: "East", cards: cards("e3c,e3d", "3♣ 3♦") }, { player: "You", cards: cards("y6s,y6h", "6♠ 6♥") },
+    { player: "West", cards: cards("w10c,w10d", "10♣ 10♦") }, { player: "Partner", cards: cards("pqc,pqd", "Q♣ Q♦") },
+  ] },
+  { number: 3, winner: "You", turns: [
+    { player: "Partner", cards: cards("p4s,p5h,p6d,p7c,p8s", "4♠ 5♥ 6♦ 7♣ 8♠") }, { player: "East" },
+    { player: "You", cards: cards("y8h,y9h,y10s,yjc,yqd", "8♥ 9♥ 10♠ J♣ Q♦") }, { player: "West" },
+  ] },
+  { number: 4, winner: "West", turns: [
+    { player: "You", cards: cards("ykc", "K♣") }, { player: "West", cards: cards("w2h", "2♥") },
+    { player: "Partner" }, { player: "East" },
+  ] },
+  { number: 5, winner: "Partner", turns: [
+    { player: "West", cards: cards("w4s,w4h", "4♠ 4♥") }, { player: "Partner", cards: cards("p6c,p6d", "6♣ 6♦") },
+    { player: "East" }, { player: "You" },
+  ] },
 ];
+const playerStyles: Record<string, PlayerStyle> = {
+  Partner: { label: "Aggressive finisher", evidence: "Overcalls often · 2 tricks won" },
+  West: { label: "Control spender", evidence: "Uses level cards early" },
+  East: { label: "Patient closer", evidence: "Passes selectively · holds power" },
+  You: { label: "Shape preserver", evidence: "Keeps bombs and control intact" },
+};
+const historyForCoach = playHistory.map((trick) => `Trick ${trick.number}: ${trick.turns.map((turn) => `${turn.player} ${turn.cards?.map((card) => `${card.rank}${card.suit}`).join(" ") ?? "passed"}`).join(", ")}; ${trick.winner} won.`).join(" ");
+const stylesForCoach = Object.entries(playerStyles).map(([player, style]) => `${player}: ${style.label} (${style.evidence})`).join("; ");
 const sample = {
   game: "guandan", ruleset: "competition-draft-2026-09",
-  position: "Our team is level 2. I lead with 9 cards. My partner has 3 cards; opponents have 8 and 12. Known hand: 3♠ 3♥ 7♠ 7♥ 7♦ 9♣ 9♦ A♠ BJ. Last trick: West played 4♠ 4♥, Partner played 6♣ 6♦ and won, East passed, I passed.",
+  position: `Our team is level 2. I lead with 9 cards. My partner has 3 cards; opponents have 8 and 12. Known hand: 3♠ 3♥ 7♠ 7♥ 7♦ 9♣ 9♦ A♠ BJ. Complete play history: ${historyForCoach} Inferred player styles: ${stylesForCoach}`,
   legalActions: plays.map((play) => play.label), playerGoal: "Help my partner finish first without wasting control cards.",
 };
 
@@ -71,12 +97,14 @@ export function CoachLab() {
           <div className="tableCenter"><b>Your turn</b><span>Select a legal play</span></div>
           <Player className="east" seat="East" count={12}/><Player className="south" seat="You" count={9}/>
         </div>
-        <section className="history" aria-label="Cards played in the previous trick">
-          <div className="historyTitle"><b>Previous trick</b><span>Partner won · You lead</span></div>
-          <div className="turns">{playHistory.map((turn) => <div className="turn" key={turn.player}>
-            <span className="turnPlayer">{turn.player}</span>
-            {turn.cards ? <div className="playedCards">{turn.cards.map((card) => <span className={card.red ? "red" : ""} key={card.id}>{card.rank}{card.suit}</span>)}</div> : <i>Pass</i>}
-            {turn.note && <small>{turn.note}</small>}
+        <section className="history" aria-label="Complete play history">
+          <div className="historyTitle"><b>Play history</b><span>5 tricks · Partner won last · You lead</span></div>
+          <div className="tricks">{playHistory.map((trick) => <div className="trick" key={trick.number}>
+            <div className="trickMeta"><b>Trick {trick.number}</b><span>{trick.winner} won</span></div>
+            <div className="turns">{trick.turns.map((turn) => <div className="turn" key={turn.player}>
+              <span className="turnPlayer">{turn.player}</span>
+              {turn.cards ? <div className="playedCards">{turn.cards.map((card) => <span className={card.red ? "red" : ""} key={card.id}>{card.rank}{card.suit}</span>)}</div> : <i>Pass</i>}
+            </div>)}</div>
           </div>)}</div>
         </section>
         <div className="hand" aria-label="Your hand">{hand.map((card) => <button key={card.id} type="button" aria-pressed={selected.includes(card.id)} aria-label={`${card.rank} ${card.suit}`} className={`playingCard ${card.red ? "red" : ""} ${card.joker ? "joker" : ""}`} onClick={() => setSelected((current) => current.includes(card.id) ? current.filter((item) => item !== card.id) : [...current, card.id])}><span>{card.rank}</span><i>{card.suit}</i></button>)}</div>
@@ -102,5 +130,9 @@ export function CoachLab() {
   </main>;
 }
 
-function Player({ className, seat, count }: { className: string; seat: string; count: number }) { return <div className={`player ${className}`}><b>{seat}</b><span>{count} cards</span></div>; }
+function Player({ className, seat, count }: { className: string; seat: string; count: number }) {
+  const style = playerStyles[seat];
+  return <div className={`player ${className}`} title={style.evidence}><b>{seat}</b><span>{count} cards</span><em>{style.label}</em></div>;
+}
 function sameCards(a: string[], b: string[]) { return a.length === b.length && a.every((card) => b.includes(card)); }
+function cards(ids: string, values: string): Card[] { return values.split(" ").map((value, index) => ({ id: ids.split(",")[index], rank: value.slice(0, -1), suit: value.slice(-1), red: value.endsWith("♥") || value.endsWith("♦") })); }
