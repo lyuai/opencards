@@ -36,32 +36,33 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .captureSteps code { padding: 2px 5px; border-radius: 4px; background: #101411; color: #e1b552; }
 .captureSteps p { margin: 0; color: #87938b; font-size: 10px; }
 .workspace { max-width: 1320px; margin: 20px auto 0; display: grid; grid-template-columns: minmax(620px, 1fr) 360px; gap: 16px; }
-.playWorkspace { max-width: 1120px; margin: 20px auto 0; }
+.playWorkspace { max-width: 1440px; margin: 16px auto 0; }
 .gameArea, aside { background: #181e1a; border: 1px solid #303a33; border-radius: 12px; }
-.gameArea { padding: 16px; }
-.dealBar { min-height: 52px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.gameArea { padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "deal deal" "order history" "table history" "handlabel history" "hand history" "controls history" "coach history" "hint history" "error history"; gap: 10px 14px; }
+.dealBar { grid-area: deal; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .dealBar > div { display: grid; gap: 3px; }
 .dealBar b { font-size: 14px; }
 .dealBar span, .handLabel span, .dealNotice span { color: #98a29c; font-size: 11px; }
-.turnOrder { margin-bottom: 10px; padding: 7px 10px; display: flex; justify-content: center; align-items: center; gap: 9px; border-radius: 7px; background: #141915; color: #7f8a83; font-size: 10px; }
+.turnOrder { grid-area: order; padding: 7px 10px; display: flex; justify-content: center; align-items: center; gap: 9px; border-radius: 7px; background: #141915; color: #7f8a83; font-size: 10px; }
 .turnOrder i { color: #59645d; font-style: normal; }
 .turnOrder span.current { padding: 3px 7px; border-radius: 5px; background: #3b311c; color: #efc767; font-weight: 700; }
-.table { min-height: 370px; position: relative; border-radius: 22px; background: #23583f; border: 1px solid #397459; }
+.table { grid-area: table; min-height: 410px; position: relative; overflow: hidden; border-radius: 20px; background: radial-gradient(circle at 50% 48%, #286447 0, #20523b 62%, #193f2e 100%); border: 1px solid #397459; box-shadow: inset 0 0 60px #0e2b1d66; }
+.table::after { content: "DANZERO TABLE"; position: absolute; left: 18px; bottom: 14px; color: #bad1c11f; font-size: 11px; font-weight: 800; letter-spacing: .18em; }
 .tableCenter { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); display: grid; gap: 5px; text-align: center; }
 .tableCenter b { font-size: 18px; }
 .tableCenter span { color: #a9c4b4; font-size: 12px; }
 .centerCards { max-width: 310px; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .centerCards span { min-width: 34px; padding: 7px 5px; border-radius: 4px; background: #f5f3ed; color: #171a17; font: 700 12px Georgia, serif; }
-.player { position: absolute; display: grid; gap: 2px; min-width: 110px; padding: 8px 10px; border-radius: 8px; background: #163d2b; border: 1px solid #48765e; text-align: center; }
-.player b { font-size: 12px; }
+.player { position: absolute; display: grid; gap: 3px; min-width: 118px; padding: 11px 12px; border-radius: 12px; background: #143725e8; border: 1px solid #4f7f66; text-align: center; box-shadow: 0 6px 20px #07170f33; }
+.player b { font-size: 13px; }
 .player span { color: #a9c4b4; font-size: 10px; }
 .player em { margin-top: 3px; color: #e0b756; font-size: 9px; font-style: normal; }
 .player.activePlayer { border-color: #e0b756; box-shadow: 0 0 0 2px #e0b75633; }
-.north { top: 14px; left: 50%; transform: translateX(-50%); }
-.south { bottom: 14px; left: 50%; transform: translateX(-50%); }
-.west { left: 14px; top: 50%; transform: translateY(-50%); }
-.east { right: 14px; top: 50%; transform: translateY(-50%); }
-.history { margin-top: 12px; padding: 12px; border: 1px solid #303a33; border-radius: 8px; background: #141915; }
+.north { top: 16px; left: 50%; transform: translateX(-50%); }
+.south { bottom: 16px; left: 50%; transform: translateX(-50%); }
+.west { left: 16px; top: 50%; transform: translateY(-50%); }
+.east { right: 16px; top: 50%; transform: translateY(-50%); }
+.history { grid-area: history; min-height: 0; padding: 13px; border: 1px solid #303a33; border-radius: 10px; background: #141915; }
 .historyTitle { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .historyTitle b { font-size: 12px; }
 .historyTitle b em { margin-left: 6px; padding: 2px 5px; border-radius: 4px; background: #2d332f; color: #9da79f; font-size: 8px; font-style: normal; font-weight: 500; text-transform: uppercase; }
@@ -79,12 +80,13 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .playedCards { min-width: 0; justify-self: end; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
 .playedCards span { min-width: 30px; padding: 5px 4px; border-radius: 4px; background: #f5f3ed; color: #171a17; font: 700 11px Georgia, serif; text-align: center; }
 .playedCards span.red { color: #b42d2d; }
-.actionLog { max-height: 300px; display: grid; gap: 5px; overflow-y: auto; }
-.logRow { min-height: 42px; padding: 6px 8px; display: grid; grid-template-columns: 34px 70px 90px 1fr; align-items: center; gap: 7px; border-radius: 6px; background: #1d241f; font-size: 10px; }
+.actionLog { max-height: 690px; display: grid; align-content: start; gap: 5px; overflow-y: auto; }
+.logRow { min-height: 48px; padding: 7px 8px; display: grid; grid-template-columns: 28px 62px 1fr; align-items: center; gap: 5px; border-radius: 7px; background: #1d241f; font-size: 10px; }
+.logRow .playedCards { grid-column: 2 / -1; justify-self: start; justify-content: flex-start; }
 .logRow > span { color: #768179; }
 .logRow > em, .logRow > i { color: #d9ad49; font-style: normal; text-transform: capitalize; }
-.hand { min-height: 124px; margin-top: 16px; display: flex; align-items: flex-end; justify-content: center; gap: 0; overflow-x: auto; padding: 8px 34px; }
-.handLabel { margin-top: 15px; display: flex; align-items: baseline; justify-content: space-between; }
+.hand { grid-area: hand; min-height: 126px; display: flex; align-items: flex-end; justify-content: center; gap: 0; overflow-x: auto; padding: 8px 34px 4px; border-radius: 10px; background: #141915; }
+.handLabel { grid-area: handlabel; display: flex; align-items: baseline; justify-content: space-between; }
 .handLabel b { font-size: 12px; }
 .playingCard { position: relative; flex: 0 0 70px; width: 70px; height: 104px; margin-left: -42px; padding: 9px; display: grid; align-content: start; justify-items: start; border-radius: 7px; border: 2px solid transparent; background: #f5f3ed; color: #161916; box-shadow: -2px 0 5px #10141155; transition: transform .12s, border-color .12s; }
 .playingCard:first-child { margin-left: 0; }
@@ -106,12 +108,13 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .primary:disabled { opacity: .45; cursor: default; }
 .secondary { padding: 9px 13px; border: 1px solid #46534b; border-radius: 7px; background: transparent; color: #dce2de; font-weight: 650; }
 .secondary:disabled { opacity: .35; cursor: default; }
-.playControls { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
-.coachRequest { margin-top: 12px; padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-radius: 8px; background: #18201b; border: 1px solid #344139; }
+.playControls { grid-area: controls; display: flex; justify-content: center; gap: 10px; }
+.playControls button { min-width: 150px; }
+.coachRequest { grid-area: coach; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-radius: 8px; background: #18201b; border: 1px solid #344139; }
 .coachRequest > div { display: grid; gap: 3px; }
 .coachRequest b { font-size: 12px; }
 .coachRequest span { color: #98a29c; font-size: 10px; }
-.coachHint { margin-top: 12px; padding: 14px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 18px; border: 1px solid #6b5628; border-radius: 8px; background: #211e16; }
+.coachHint { grid-area: hint; padding: 14px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 18px; border: 1px solid #6b5628; border-radius: 8px; background: #211e16; }
 .coachAdvice { display: grid; gap: 7px; }
 .coachHint b { color: #e1b552; font-size: 11px; }
 .coachHint h3 { margin: 0; color: #f0e5c9; font-size: 17px; }
@@ -120,7 +123,7 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .coachButtons { display: grid; gap: 7px; }
 .dealNotice { margin-top: 12px; padding: 10px 12px; display: flex; justify-content: space-between; gap: 12px; border-radius: 7px; background: #141915; }
 .dealNotice b { color: #d8aa43; font-size: 11px; }
-.error { margin: 12px 0 0; color: #ff958b; font-size: 12px; }
+.error { grid-area: error; margin: 0; color: #ff958b; font-size: 12px; }
 aside { padding: 20px; min-height: 560px; }
 .coachTitle { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 15px; border-bottom: 1px solid #303a33; }
 .coachTitle b { font-size: 15px; }
@@ -145,6 +148,6 @@ ul { padding-left: 18px; line-height: 1.5; }
 .feedback textarea { resize: vertical; padding: 9px; border: 1px solid #3c4941; border-radius: 6px; background: #111513; color: #eef2ef; }
 .feedback button { margin-top: 9px; padding: 7px 10px; border: 1px solid #46534b; border-radius: 6px; background: transparent; color: #dce2de; }
 .feedback small { display: block; margin-top: 7px; color: #98a39c; }
-@media (max-width: 980px) { .workspace { grid-template-columns: minmax(0, 1fr); } .gameArea { min-width: 0; } aside { min-height: auto; } .empty { padding: 55px 22px; } }
+@media (max-width: 1080px) { .workspace { grid-template-columns: minmax(0, 1fr); } .gameArea { min-width: 0; grid-template-columns: 1fr; grid-template-areas: "deal" "order" "table" "handlabel" "hand" "controls" "coach" "hint" "error" "history"; } .history { max-height: 360px; } .actionLog { max-height: 290px; } aside { min-height: auto; } .empty { padding: 55px 22px; } }
 @media (max-width: 820px) { .trick { grid-template-columns: 1fr; } .trickMeta { grid-template-columns: 1fr auto; } .turns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 680px) { main { padding: 0 10px 20px; } header { height: 56px; } header > span { display: none; } header nav a { padding-inline: 8px; } .trainingIntro { margin-top: 32px; } .importPanel form { grid-template-columns: 1fr auto; } .importPanel form > div { grid-column: 1 / -1; } .jobStatus { grid-template-columns: auto auto 1fr; } .jobStatus progress { width: 100%; } .jobStatus > span:nth-of-type(2), .jobStatus em { grid-column: 2 / -1; } .workspace { margin-top: 10px; } .gameArea { padding: 10px; } .table { min-height: 300px; } .hand { justify-content: flex-start; padding-inline: 2px; } .playingCard { flex-basis: 62px; width: 62px; height: 92px; margin-left: -28px; } .playingCard:first-child { margin-left: 0; } .actions { grid-template-columns: 1fr; } .primary { width: 100%; } }
