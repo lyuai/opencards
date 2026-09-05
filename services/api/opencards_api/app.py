@@ -6,6 +6,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+from .copilot import ask_copilot
 from .game import GameStore
 from .store import JobStore
 
@@ -61,6 +62,25 @@ def create_app(testing: bool = False) -> Flask:
         except Exception as exc:
             app.logger.exception("DanZero coach")
             return error(f"DanZero policy unavailable: {exc}", 502)
+
+    @app.post("/v1/games/guandan/deals/<game_id>/copilot/messages")
+    def copilot_message(game_id):
+        game = games.get(game_id)
+        if not game:
+            return error("game not found", 404)
+        body = request.get_json(silent=True) or {}
+        message = str(body.get("message", "")).strip()
+        if not message:
+            return error("message is required", 400)
+        try:
+            return jsonify(ask_copilot(game.copilot_context(), game.advise(), message, body.get("conversation") or []))
+        except ValueError as exc:
+            return error(str(exc), 409)
+        except RuntimeError as exc:
+            return error(str(exc), 503)
+        except Exception as exc:
+            app.logger.exception("Arena Copilot")
+            return error(f"Arena Copilot unavailable: {exc}", 502)
 
     @app.post("/v1/imports")
     def create_import():

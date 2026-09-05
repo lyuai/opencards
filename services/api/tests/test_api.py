@@ -32,3 +32,25 @@ def test_deal_coach_and_play_contract(tmp_path, monkeypatch):
     )
     assert play_response.status_code == 200
     assert play_response.get_json()["history"]
+
+
+def test_copilot_chat_receives_live_game_context(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENCARDS_DATA_DIR", str(tmp_path))
+    captured = {}
+
+    def fake_copilot(game_state, recommendation, message, conversation):
+        captured.update(game_state=game_state, recommendation=recommendation, message=message, conversation=conversation)
+        return {"content": "Because it preserves the pair.", "provider": "test", "responseId": "response-1"}
+
+    monkeypatch.setattr("opencards_api.app.ask_copilot", fake_copilot)
+    client = create_app(testing=True).test_client()
+    deal = client.post("/v1/games/guandan/deals").get_json()
+    response = client.post(
+        f'/v1/games/guandan/deals/{deal["id"]}/copilot/messages',
+        json={"message": "Why this move?", "conversation": []},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["content"] == "Because it preserves the pair."
+    assert captured["game_state"]["id"] == deal["id"]
+    assert captured["game_state"]["legalActions"]
+    assert captured["recommendation"]["cardIds"] is not None

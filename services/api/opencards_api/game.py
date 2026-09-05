@@ -30,7 +30,7 @@ class HumanAgent(GuandanAgent):
 
 def _rank(code: str) -> str:
     value = code[1:]
-    return {"T": "10", "B": "小王", "R": "大王"}.get(value, value)
+    return {"T": "10", "B": "BJ", "R": "RJ"}.get(value, value)
 
 
 def _card(code: str, identity: str) -> dict:
@@ -136,6 +136,20 @@ class PolicyGame:
             self.env.step(legal)
             self._auto_advance()
             return self.view()
+
+    def copilot_context(self) -> dict:
+        with self.lock:
+            context = self.view()
+            state = self.env.get_state(0)
+            context["legalActions"] = [
+                {"kind": "pass"} if action[0] == "PASS" else {
+                    "kind": "play",
+                    "cards": _cards(action[2], f"legal-{index}"),
+                    "combination": _combo(action),
+                }
+                for index, action in enumerate(state.get("actions", []), start=1)
+            ] if self.env.get_player_id() == 0 else []
+            return context
 
     def _find_action(self, codes: list[str]):
         actions = self.env.get_state(0).get("actions", [])
