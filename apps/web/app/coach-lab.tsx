@@ -13,6 +13,7 @@ type Game = {
   counts: Record<"south" | "west" | "north" | "east", number>;
   turn: "south" | "west" | "north" | "east"; currentPlay?: Action;
   history: Action[]; finished: string[]; gameOver: boolean; createdAt: string;
+  settings: { seed: number | null; opponentPolicy: string };
 };
 
 const seats = [
@@ -32,20 +33,27 @@ export function CoachLab() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [opponentPolicy, setOpponentPolicy] = useState("danzero");
+  const [dealSeed, setDealSeed] = useState("");
+  const [autoCoach, setAutoCoach] = useState(true);
+  const [confirmPlay, setConfirmPlay] = useState(false);
+  const [compactCards, setCompactCards] = useState(false);
   const [error, setError] = useState("");
 
   const dealCards = useCallback(async () => {
     setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]);
     try {
-      const response = await fetch(`${api}/v1/games/guandan/deals`, { method: "POST" });
+      const response = await fetch(`${api}/v1/games/guandan/deals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ opponentPolicy, seed: dealSeed === "" ? null : Number(dealSeed) }) });
       const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Could not deal cards"); setGame(body); void requestCoach(body);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not deal cards"); }
     finally { setLoading(false); }
-  }, [api]);
-  useEffect(() => { void dealCards(); }, [dealCards]);
+  }, [api, autoCoach, dealSeed, opponentPolicy]);
+  useEffect(() => { void dealCards(); }, []); // Deal once; settings apply explicitly through Apply & Deal.
 
   async function act(pass: boolean, cards: string[] = selected) {
     if (!game) return; setLoading(true); setError("");
+    if (confirmPlay && !window.confirm(pass ? "Pass this turn?" : `Play ${cards.length} selected card${cards.length === 1 ? "" : "s"}?`)) { setLoading(false); return; }
     try {
       const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardIds: pass ? [] : cards, pass }) });
       const body = await response.json();
@@ -55,8 +63,8 @@ export function CoachLab() {
     finally { setLoading(false); }
   }
 
-  async function requestCoach(nextGame: Game) {
-    if (nextGame.turn !== "south" || nextGame.gameOver) return;
+  async function requestCoach(nextGame: Game, force = false) {
+    if (nextGame.turn !== "south" || nextGame.gameOver || (!autoCoach && !force)) return;
     setCoachLoading(true);
     try {
       const response=await fetch(`${api}/v1/games/guandan/deals/${nextGame.id}/coach`,{method:"POST"});
@@ -64,6 +72,8 @@ export function CoachLab() {
     } catch(caught){setError(caught instanceof Error?caught.message:"AI coach unavailable");}
     finally{setCoachLoading(false);}
   }
+
+  async function askAICoach() { if (game) await requestCoach(game, true); }
 
   async function sendCopilotMessage(message = chatDraft) {
     const clean = message.trim();
@@ -88,9 +98,9 @@ export function CoachLab() {
     return groups;
   }, []) ?? [];
   return <main>
-    <header><nav><Link className="active" href="/">Arena</Link><Link href="/training">Training</Link></nav></header>
+    <header><nav><Link className="active" href="/">Arena</Link><Link href="/training">Training</Link></nav><button className="settingsToggle" aria-label="Game settings" aria-expanded={settingsOpen} onClick={()=>setSettingsOpen((open)=>!open)}>⚙</button></header>
     <div className="playWorkspace">
-      <section className="gameArea" aria-label="Guandan card table">
+      <section className={`gameArea ${compactCards ? "compactCards" : ""}`} aria-label="Guandan card table">
         <div className="dealBar"><b>{game?.gameOver ? "Game over" : yourTurn ? "Your turn" : `${seatLabels[game?.turn ?? ""] ?? "AI"} to play`}</b><button className="secondary" type="button" disabled={loading} onClick={dealCards}>New Deal</button></div>
         <div className="table">
           {seats.map((seat) => <Player key={seat.id} className={seat.className} label={seat.label} role={seat.role} count={game?.counts[seat.id] ?? 0} active={game?.turn === seat.id}/>) }
@@ -102,11 +112,12 @@ export function CoachLab() {
           <div className="copilotTabs"><button className={copilotTab === "coach" ? "active" : ""} onClick={() => setCopilotTab("coach")}>AI Coach</button><button className={copilotTab === "history" ? "active" : ""} onClick={() => setCopilotTab("history")}>History <small>{game?.history.length ?? 0}</small></button></div>
           {copilotTab === "coach" ? <div className="coachPanel">
             {coachLoading && !aiAdvice && <div className="coachThinking"><i/><span>Enumerating legal moves, comparing policy values, and reading the table…</span></div>}
-            {aiAdvice ? <div className="coachAnalysis"><section className="moveFeed">{aiAdvice.moveAnalyses.map((item)=><article key={item.index}><span>#{item.index} · {seatLabels[item.seat]}</span><strong>{item.summary}</strong><p>{item.impact}</p></article>)}</section><span className="analysisLabel">{aiAdvice.confidence > 0 ? `${Math.round(aiAdvice.confidence * 100)}% CONFIDENCE` : "UNCALIBRATED POLICY PICK"}</span><h3>{aiAdvice.cardIds.length===0?"Pass this turn":`Play ${coachCards.map(cardText).join(" ")}`}</h3><div className="recommendedCards">{coachCards.map((card)=><MiniCard card={card} key={card.id}/>)}</div><section><p>{aiAdvice.rationale}</p></section>{aiAdvice.alternatives.length > 0 && <section><ul>{aiAdvice.alternatives.map((item)=><li key={item}>{item}</li>)}</ul></section>}{aiAdvice.assumptions.length > 0 && <section><ul>{aiAdvice.assumptions.map((item)=><li key={item}>{item}</li>)}</ul></section>}<div className="coachButtons">{aiAdvice.cardIds.length===0?<button className="primary" onClick={()=>void act(true)}>Follow: Pass</button>:<><button className="secondary" onClick={()=>setSelected(aiAdvice.cardIds)}>Highlight Cards</button><button className="primary" onClick={()=>void act(false,aiAdvice.cardIds)}>Play This Move</button></>}</div><small className="modelNote">Powered by DanZero</small></div> : !coachLoading && <div className="coachEmpty">Waiting for your turn.</div>}
+            {aiAdvice ? <div className="coachAnalysis"><section className="moveFeed">{aiAdvice.moveAnalyses.map((item)=><article key={item.index}><span>#{item.index} · {seatLabels[item.seat]}</span><strong>{item.summary}</strong><p>{item.impact}</p></article>)}</section><span className="analysisLabel">{aiAdvice.confidence > 0 ? `${Math.round(aiAdvice.confidence * 100)}% CONFIDENCE` : "UNCALIBRATED POLICY PICK"}</span><h3>{aiAdvice.cardIds.length===0?"Pass this turn":`Play ${coachCards.map(cardText).join(" ")}`}</h3><div className="recommendedCards">{coachCards.map((card)=><MiniCard card={card} key={card.id}/>)}</div><section><p>{aiAdvice.rationale}</p></section>{aiAdvice.alternatives.length > 0 && <section><ul>{aiAdvice.alternatives.map((item)=><li key={item}>{item}</li>)}</ul></section>}{aiAdvice.assumptions.length > 0 && <section><ul>{aiAdvice.assumptions.map((item)=><li key={item}>{item}</li>)}</ul></section>}<div className="coachButtons">{aiAdvice.cardIds.length===0?<button className="primary" onClick={()=>void act(true)}>Follow: Pass</button>:<><button className="secondary" onClick={()=>setSelected(aiAdvice.cardIds)}>Highlight Cards</button><button className="primary" onClick={()=>void act(false,aiAdvice.cardIds)}>Play This Move</button></>}</div><small className="modelNote">Powered by DanZero</small></div> : !coachLoading && <div className="coachEmpty"><button className="secondary" onClick={()=>void askAICoach()}>Analyze this turn</button></div>}
             <div className="chatThread">{chatMessages.map((item, index)=><div className={`chatMessage ${item.role}`} key={index}>{item.content}</div>)}{chatLoading && <div className="chatMessage assistant">Thinking…</div>}</div>
             <form className="copilotComposer" onSubmit={(event)=>{event.preventDefault(); void sendCopilotMessage();}}><textarea aria-label="Ask Arena Copilot" rows={2} value={chatDraft} onChange={(event)=>setChatDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();void sendCopilotMessage();}}} placeholder="Ask about this position…"/><button type="submit" aria-label="Send message" disabled={!chatDraft.trim()||chatLoading}>↑</button></form>
           </div> : <section className="history" aria-label="Complete play history"><div className="actionLog">{game?.history.map((action) => <div className="logRow" key={action.index}><span>#{action.index}</span><b>{seatLabels[action.seat]}</b>{action.kind === "pass" ? <i>Pass</i> : <><em>{comboLabel(action.combination?.type)}</em><div className="playedCards">{action.cards?.map((card) => <MiniCard card={card} key={card.id}/>)}</div></>}</div>)}</div></section>}
         </aside>
+        {settingsOpen && <section className="gameSettings" aria-label="Game settings"><label>Opponents<select value={opponentPolicy} onChange={(event)=>setOpponentPolicy(event.target.value)}><option value="danzero">DanZero · Expert</option><option value="base1">Competition Base1 · Intermediate</option><option value="random">Random · Beginner</option></select></label><label>Replay seed<input inputMode="numeric" value={dealSeed} onChange={(event)=>setDealSeed(event.target.value.replace(/\D/g,""))} placeholder="Random"/></label><label><input type="checkbox" checked={autoCoach} onChange={(event)=>setAutoCoach(event.target.checked)}/>Automatic coaching</label><label><input type="checkbox" checked={confirmPlay} onChange={(event)=>setConfirmPlay(event.target.checked)}/>Confirm before playing</label><label><input type="checkbox" checked={compactCards} onChange={(event)=>setCompactCards(event.target.checked)}/>Compact hand</label><button className="primary" onClick={()=>{setSettingsOpen(false);void dealCards();}}>Apply & Deal</button></section>}
       </section>
     </div>
   </main>;

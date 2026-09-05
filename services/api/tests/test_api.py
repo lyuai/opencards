@@ -54,3 +54,12 @@ def test_copilot_chat_receives_live_game_context(tmp_path, monkeypatch):
     assert captured["game_state"]["id"] == deal["id"]
     assert captured["game_state"]["legalActions"]
     assert captured["recommendation"]["cardIds"] is not None
+
+
+def test_deal_accepts_reproducible_opponent_settings(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENCARDS_DATA_DIR", str(tmp_path))
+    client = create_app(testing=True).test_client()
+    first = client.post("/v1/games/guandan/deals", json={"seed": 42, "opponentPolicy": "random"}).get_json()
+    second = client.post("/v1/games/guandan/deals", json={"seed": 42, "opponentPolicy": "random"}).get_json()
+    assert first["settings"] == {"seed": 42, "opponentPolicy": "random"}
+    assert [card["rank"] + card["suit"] for card in first["yourHand"]] == [card["rank"] + card["suit"] for card in second["yourHand"]]

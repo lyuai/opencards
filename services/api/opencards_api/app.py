@@ -34,7 +34,13 @@ def create_app(testing: bool = False) -> Flask:
     @app.post("/v1/games/guandan/deals")
     def create_deal():
         try:
-            return jsonify(games.create().view()), 201
+            body = request.get_json(silent=True) or {}
+            seed = body.get("seed")
+            if seed is not None:
+                seed = int(seed)
+            return jsonify(games.create(seed=seed, opponent_policy=body.get("opponentPolicy", "danzero")).view()), 201
+        except (TypeError, ValueError) as exc:
+            return error(str(exc), 422)
         except Exception as exc:  # model load failures must be visible
             app.logger.exception("create DanZero deal")
             return error(f"could not start DanZero game: {exc}", 500)

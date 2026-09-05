@@ -72,14 +72,17 @@ def _move_analyses(history: list[dict]) -> list[dict]:
 
 
 class PolicyGame:
-    def __init__(self, seed: int | None = None):
+    def __init__(self, seed: int | None = None, opponent_policy: str = "danzero"):
         self.id = f"deal-{uuid.uuid4().hex}"
         self.created_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         self.human_player_ids = [0]
         self.env = guandan_rlcard.make({"seed": seed, "perfect_info": False})
         random_state = np.random.RandomState(seed)
-        Danzero = get_agent_class("danzero")
-        self.agents = [HumanAgent(0, random_state)] + [Danzero(i, np.random.RandomState(None if seed is None else seed + i)) for i in range(1, 4)]
+        if opponent_policy not in {"random", "base1", "danzero"}:
+            raise ValueError("opponentPolicy must be random, base1, or danzero")
+        Opponent = get_agent_class(opponent_policy)
+        self.opponent_policy = opponent_policy
+        self.agents = [HumanAgent(0, random_state)] + [Opponent(i, np.random.RandomState(None if seed is None else seed + i)) for i in range(1, 4)]
         self.env.set_agents(self.agents)
         self.env.reset()
         # A separate learned policy advises the human seat without taking it over.
@@ -122,6 +125,7 @@ class PolicyGame:
                 "history": history, "finished": [SEATS[p] for p in getattr(env.game.round, "result", []) if p >= 0],
                 "gameOver": bool(env.is_over()), "createdAt": self.created_at,
                 "policy": {"name": "DanZero", "kind": "learned", "model": "bundled-q-network"},
+                "settings": {"seed": self.advisor_seed, "opponentPolicy": self.opponent_policy},
             }
 
     def act(self, card_ids: list[str], passed: bool) -> dict:
@@ -233,8 +237,8 @@ class GameStore:
         self._games: dict[str, PolicyGame] = {}
         self._lock = threading.RLock()
 
-    def create(self, seed: int | None = None) -> PolicyGame:
-        game = PolicyGame(seed)
+    def create(self, seed: int | None = None, opponent_policy: str = "danzero") -> PolicyGame:
+        game = PolicyGame(seed, opponent_policy)
         with self._lock:
             self._games[game.id] = game
         return game
