@@ -151,9 +151,13 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .chatMessage { max-width: 92%; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
 .chatMessage.user { justify-self: end; background: #d8aa43; color: #1c180f; }
 .chatMessage.assistant { justify-self: start; background: #242d27; color: #d8dfda; }
-.copilotComposer { position: absolute; right: 12px; bottom: 12px; left: 12px; padding: 18px 4px 0; display: grid; grid-template-columns: 1fr auto; gap: 7px; background: linear-gradient(180deg, transparent, #101612 26%); }
-.copilotComposer textarea { min-width: 0; resize: none; padding: 9px 10px; border: 1px solid #3c4941; border-radius: 9px; background: #0d130f; color: #eef2ef; font-size: 12px; }
-.copilotComposer button { min-width: 58px; padding-inline: 10px; }
+.copilotComposer { position: absolute; right: 12px; bottom: 12px; left: 12px; padding: 10px 10px 9px 13px; display: grid; grid-template-columns: 1fr 36px; gap: 8px; align-items: end; border: 1px solid #435047; border-radius: 15px; background: #19211cfa; box-shadow: 0 10px 28px #050b0780, inset 0 1px #ffffff08; transition: border-color .15s, box-shadow .15s; }
+.copilotComposer:focus-within { border-color: #b58a32; box-shadow: 0 12px 32px #050b0799, 0 0 0 3px #d8aa4318; }
+.copilotComposer textarea { min-width: 0; min-height: 38px; max-height: 110px; resize: none; padding: 5px 0; border: 0; outline: 0; background: transparent; color: #eef2ef; font-size: 13px; line-height: 1.45; }
+.copilotComposer textarea::placeholder { color: #758078; }
+.copilotComposer button { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: #d8aa43; color: #18150e; font-size: 20px; font-weight: 750; line-height: 1; box-shadow: 0 3px 10px #0005; transition: transform .12s, background .12s; }
+.copilotComposer button:hover:not(:disabled) { transform: translateY(-1px); background: #e4b64f; }
+.copilotComposer button:disabled { background: #343d37; color: #6f7a72; box-shadow: none; cursor: default; }
 .dealNotice { margin-top: 12px; padding: 10px 12px; display: flex; justify-content: space-between; gap: 12px; border-radius: 7px; background: #141915; }
 .dealNotice b { color: #d8aa43; font-size: 11px; }
 .error { position: fixed; z-index: 30; right: 390px; bottom: 20px; left: 20px; margin: 0; padding: 10px 12px; border-radius: 8px; background: #471d1de8; color: #ffb0a9; font-size: 12px; }
