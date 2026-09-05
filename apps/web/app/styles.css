@@ -96,8 +96,12 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .playingCard span { font: 750 20px/1 "Helvetica Neue", Arial, sans-serif; letter-spacing: -.02em; }
 .playingCard i { font-style: normal; font-size: 17px; }
 .playingCard.red { color: #b42d2d; }
-.playingCard.joker { background: #2a302c; color: #edc25f; }
-.playingCard.joker span { font-size: 11px; }
+.playingCard.joker { border-color: #c8c2b3; background: linear-gradient(160deg, #fffdf7, #ece8dc); color: #343a36; }
+.playingCard.joker span { font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.playingCard.joker i { color: #7a817c; font-size: 24px; line-height: 1; }
+.playingCard.joker small { color: #69716c; font-size: 8px; font-weight: 800; letter-spacing: .08em; }
+.playingCard.joker.redJoker { border-color: #d9a6a0; background: linear-gradient(160deg, #fffdf8, #f6e5df); color: #b42d2d; }
+.playingCard.joker.redJoker i, .playingCard.joker.redJoker small { color: #c13b35; }
 .playingCard.wild { border-color: #e0ad3f; background: #fff6dc; }
 .playingCard.recommended { border-style: dashed; border-color: #e0ad3f; }
 .playingCard small { position: absolute; right: 5px; bottom: 5px; color: #b47b10; font-size: 9px; }
