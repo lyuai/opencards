@@ -20,7 +20,7 @@ Worker identity is protocol metadata used for lease ownership, not a machine
 management product. There is no fleet UI, remote administration, or manual
 provisioning in the initial scope.
 
-The initial job store is a local persisted file behind the Go API. The protocol
+The initial job store is a local persisted file behind the Python API. The protocol
 keeps persistence replaceable by PostgreSQL or Supabase Queues. Browser
 credentials and raw captures remain local; only canonical replay data and
 explicitly selected evidence are returned to the platform.

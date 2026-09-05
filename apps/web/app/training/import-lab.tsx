@@ -37,7 +37,7 @@ export function ImportLab() {
       <form onSubmit={submit}><div><b>Import game video</b><span>The local worker will claim this task.</span></div><input aria-label="Bilibili video URL" value={url} onChange={(event) => setURL(event.target.value)} type="url" required/><button type="submit">Create task</button></form>
       {job && <div className="jobStatus"><span className={`statusDot ${job.status}`}/><b>{job.stage.replaceAll("_", " ")}</b><progress value={job.progress} max="1"/><span>{job.message || `Waiting for a local worker · ${job.id}`}</span>{job.result?.extractionStatus && <em>{job.result.extractionStatus.replaceAll("_", " ")}</em>}</div>}
       {job?.result && <div className="captureSummary"><b>{job.result.stableCandidates?.length ?? 0} stable candidates from {job.result.observations?.length ?? 0} table changes</b><span>{job.result.validation?.message ?? job.result.message}</span><span>{job.result.validation?.potentialJumpCuts ?? 0} possible jump cuts · {job.result.metrics?.paidModelCalls ?? 0} paid AI calls</span></div>}
-      {error && <p className="error">{error}. Is the Go API running?</p>}
+      {error && <p className="error">{error}. Is the Python API running?</p>}
     </section>
     <section className="captureSteps"><b>Ingestion order</b><ol><li>Reuse the local media cache when available.</li><li>Otherwise download publicly accessible media directly.</li><li>Use the authenticated browser capture only as fallback.</li></ol><p>Media stays local. Only stable table changes continue to card recognition.</p></section>
   </main>;

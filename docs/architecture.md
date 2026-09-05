@@ -20,7 +20,7 @@
 ```text
 Next.js / future Unity
         |
- Go API: auth, library, sessions, feedback, jobs
+ Python API: auth, library, sessions, feedback, jobs
         |
   +-----+----------------+------------------+
   |                      |                  |
@@ -32,7 +32,8 @@ replay/events       retrieval + search  OCR/CV/transcript
                 versioned Markdown vault
 ```
 
-Start as a modular Go monolith plus asynchronous workers. Split services only when
+Start as a modular Python monolith plus asynchronous workers. The Python runtime
+keeps the learned Guandan policies and game engine in-process. Split services only when
 scale or deployment isolation demands it. Use PostgreSQL for transactional data,
 object storage for source media/artifacts, and a queue for ingestion/simulation.
 Embeddings are a derived index; Git Markdown remains the knowledge source.

@@ -1,0 +1,4 @@
+[submodule "third_party/rlcard-guandan"]
+	path = third_party/rlcard-guandan
+	url = https://github.com/Choysang/rlcard-guandan.git
+	branch = main

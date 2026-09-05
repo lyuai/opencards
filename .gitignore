@@ -8,5 +8,8 @@ node_modules/
 dist/
 coverage/
 bin/
+.venv/
+__pycache__/
+.pytest_cache/
 *.log
 services/api/data/

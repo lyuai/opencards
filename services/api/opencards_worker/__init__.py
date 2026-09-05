@@ -1,0 +1,2 @@
+"""OpenCards local ingestion worker."""
+

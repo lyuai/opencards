@@ -10,8 +10,8 @@ is the new web-first platform; a Unity client will consume the same APIs later.
 
 ```text
 apps/web/             Next.js coaching and replay interface
-services/api/         Go API and orchestration service
-services/api/cmd/worker/ Self-registering local extraction worker
+services/api/         Python API, DanZero policy, and local worker
+third_party/rlcard-guandan/ Pinned game engine and pretrained DanZero model
 packages/contracts/   Versioned JSON Schemas shared by every client
 knowledge/            Obsidian-compatible rules and strategy vault
 docs/                 Architecture, decisions, and delivery roadmap
@@ -19,9 +19,12 @@ docs/                 Architecture, decisions, and delivery roadmap
 
 ## Start locally
 
-Requirements: Node.js 22+, pnpm 10+, and Go 1.24+.
+Requirements: Node.js 22+, pnpm 10+, Python 3.9+, FFmpeg, and yt-dlp.
 
 ```sh
+git submodule update --init
+python3 -m venv services/api/.venv
+services/api/.venv/bin/pip install -r services/api/requirements-dev.txt
 pnpm install
 pnpm dev
 ```
@@ -29,15 +32,13 @@ pnpm dev
 In another terminal:
 
 ```sh
-cd services/api
-go run ./cmd/api
+npm run api
 ```
 
 Start the first local worker in a third terminal:
 
 ```sh
-cd services/api
-go run ./cmd/worker
+npm run worker
 ```
 
 Submit a Bilibili URL in the web interface. The job is persisted locally, leased
@@ -57,25 +58,15 @@ Then open <http://localhost:3000>. The API listens on
 
 ## AI coaching prototype
 
-Copy `.env.example` to `.env`, set `AI_API_KEY`, then export those values only
-in the Go API process. Without a key, the same workflow runs in clearly labeled
-demo mode. Never place an API key in `NEXT_PUBLIC_*` variables or commit `.env`.
+The authoritative game and legal action list come from `rlcard-guandan`. All three
+computer seats and the hint endpoint use its bundled pretrained DanZero Deep Monte
+Carlo value network. The hint is matched back to the engine's exact `actionList`;
+an out-of-list model action is rejected. No LLM or hand-written opening rule chooses
+the move. Future language-model calls may explain the policy output, but cannot
+replace it or invent a confidence score.
 
-Set `AI_BASE_URL`, `AI_MODEL`, `AI_PROVIDER`, and `AI_PROTOCOL` to switch providers.
-Supported protocols are `responses` and `chat-completions`. The conventional `OPENAI_API_KEY`,
-`OPENAI_MODEL`, and `OPENAI_BASE_URL` names remain supported as aliases. A provider
-using Chat Completions should request JSON output; the server still rejects any
-recommendation that is not present in the submitted legal-action list.
-
-The prototype preset uses `openai/gpt-5.6-luna` through OpenRouter's Responses API.
-It keeps provider routing replaceable while giving the coaching path native
-Structured Outputs at a cost-efficient model tier.
-
-The current vertical slice submits a 掼蛋 position and a deterministic list of
-legal actions to `POST /v1/coach`. OpenAI Structured Outputs return the selected
-action, rationale, assumptions, confidence, and knowledge IDs. The backend rejects
-recommendations outside the supplied legal-action list. Corrections sent through
-`POST /v1/feedback` enter a review queue rather than changing strategy directly.
+Run `npm run test:api` to execute both our HTTP/full-match regression suite and the
+pinned upstream engine suite.
 
 ## Product principles
 

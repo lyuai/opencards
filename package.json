@@ -5,6 +5,10 @@
   "scripts": {
     "dev": "pnpm --filter @opencards/web dev",
     "build": "pnpm --filter @opencards/web build",
-    "typecheck": "pnpm --filter @opencards/web typecheck"
+    "typecheck": "pnpm --filter @opencards/web typecheck",
+    "api": "PYTHONPATH=services/api:third_party/rlcard-guandan services/api/.venv/bin/python -m opencards_api.app",
+    "worker": "PYTHONPATH=services/api:third_party/rlcard-guandan services/api/.venv/bin/python -m opencards_worker.main",
+    "test:api": "PYTHONPATH=services/api:third_party/rlcard-guandan services/api/.venv/bin/pytest -q services/api/tests third_party/rlcard-guandan/tests",
+    "benchmark:policy": "PYTHONHASHSEED=0 PYTHONPATH=third_party/rlcard-guandan services/api/.venv/bin/python services/api/scripts/benchmark_policy.py"
   }
 }
