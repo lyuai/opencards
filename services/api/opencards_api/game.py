@@ -54,6 +54,23 @@ def _combo(action) -> dict | None:
     return {"type": COMBOS.get(action[0], action[0].lower()), "size": len(cards), "power": 0}
 
 
+def _move_analyses(history: list[dict]) -> list[dict]:
+    analyses = []
+    labels = {"south": "You", "east": "East", "north": "Partner", "west": "West"}
+    for action in history:
+        actor = labels[action["seat"]]
+        if action["kind"] == "pass":
+            summary = f"{actor} passed."
+            impact = "They preserve their hand but surrender the chance to take control of this trick."
+        else:
+            combo = action.get("combination", {}).get("type", "play").replace("_", " ")
+            cards = " ".join(f'{card["rank"]}{card["suit"]}' for card in action.get("cards", []))
+            summary = f"{actor} played {cards} ({combo})."
+            impact = "This becomes the active target; later seats must beat it with a legal higher play or pass."
+        analyses.append({"index": action["index"], "seat": action["seat"], "summary": summary, "impact": impact})
+    return analyses
+
+
 class PolicyGame:
     def __init__(self, seed: int | None = None):
         self.id = f"deal-{uuid.uuid4().hex}"
@@ -156,10 +173,11 @@ class PolicyGame:
             return {
                 "provider": "policy:danzero", "recommendation": label,
                 "cardIds": ids, "combination": _combo(legal),
-                "rationale": "DanZero 深度蒙特卡洛价值网络在当前完整公开历史和合法动作集合中选择了该动作；这是学习策略输出，不是人工编写的出牌规则。",
+                "rationale": "DanZero selected this action with its learned Deep Monte-Carlo value policy after reading the current public history and complete legal action set. The model does not expose calibrated action probabilities, so no confidence score is invented.",
                 "alternatives": [],
-                "assumptions": ["对手与队友手牌未知", "当前建议来自 DanZero 随仓预训练权重"],
+                "assumptions": ["Opponent and partner hands are hidden", "The recommendation uses the bundled pretrained DanZero weights"],
                 "confidence": 0,
+                "moveAnalyses": _move_analyses(self.view()["history"]),
                 "policy": {"name": "DanZero", "action": legal, "legalActionCount": len(state.get("actions", []))},
             }
 

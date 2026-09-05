@@ -23,6 +23,8 @@ def test_deal_coach_and_play_contract(tmp_path, monkeypatch):
     assert coach_response.status_code == 200
     advice = coach_response.get_json()
     assert advice["provider"] == "policy:danzero"
+    assert len(advice["moveAnalyses"]) == len(deal["history"])
+    assert {item["seat"] for item in advice["moveAnalyses"]} <= {"south", "east", "north", "west"}
 
     play_response = client.post(
         f'/v1/games/guandan/deals/{deal["id"]}/actions',
@@ -30,4 +32,3 @@ def test_deal_coach_and_play_contract(tmp_path, monkeypatch):
     )
     assert play_response.status_code == 200
     assert play_response.get_json()["history"]
-
