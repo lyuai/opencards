@@ -79,6 +79,8 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .playedCards { min-width: 0; justify-self: end; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
 .playedCards span { min-width: 30px; padding: 5px 4px; border-radius: 4px; background: #f5f3ed; color: #171a17; font: 750 11px/1 "Helvetica Neue", Arial, sans-serif; text-align: center; }
 .playedCards span.red { color: #b42d2d; }
+.playedCards span.gold, .centerCards span.gold, .recommendedCards span.gold { color: #a8740d; }
+.playedCards span.silver, .centerCards span.silver, .recommendedCards span.silver { color: #707a80; }
 .actionLog { max-height: 690px; display: grid; align-content: start; gap: 5px; overflow-y: auto; }
 .logRow { min-height: 52px; padding: 8px; display: grid; grid-template-columns: 30px 68px 1fr; align-items: center; gap: 6px; border-radius: 7px; background: #1d241f; font-size: 12px; }
 .logRow .playedCards { grid-column: 2 / -1; justify-self: start; justify-content: flex-start; }
@@ -96,12 +98,12 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .playingCard span { font: 750 20px/1 "Helvetica Neue", Arial, sans-serif; letter-spacing: -.02em; }
 .playingCard i { font-style: normal; font-size: 17px; }
 .playingCard.red { color: #b42d2d; }
-.playingCard.joker { border-color: #c8c2b3; background: linear-gradient(160deg, #fffdf7, #ece8dc); color: #343a36; }
+.playingCard.joker { border-color: #b9bec1; background: linear-gradient(160deg, #fff, #e4e8e9); color: #5f686d; }
 .playingCard.joker span { font-size: 10px; font-weight: 800; letter-spacing: .08em; }
-.playingCard.joker i { color: #7a817c; font-size: 24px; line-height: 1; }
-.playingCard.joker small { color: #69716c; font-size: 8px; font-weight: 800; letter-spacing: .08em; }
-.playingCard.joker.redJoker { border-color: #d9a6a0; background: linear-gradient(160deg, #fffdf8, #f6e5df); color: #b42d2d; }
-.playingCard.joker.redJoker i, .playingCard.joker.redJoker small { color: #c13b35; }
+.playingCard.joker i { color: #879096; font-size: 24px; line-height: 1; }
+.playingCard.joker small { color: #747e84; font-size: 8px; font-weight: 800; letter-spacing: .08em; }
+.playingCard.joker.goldJoker { border-color: #d3aa43; background: linear-gradient(160deg, #fffdf4, #f3e4b8); color: #9a6b08; }
+.playingCard.joker.goldJoker i, .playingCard.joker.goldJoker small { color: #b47b0d; }
 .playingCard.wild { border-color: #e0ad3f; background: #fff6dc; }
 .playingCard.recommended { border-style: dashed; border-color: #e0ad3f; }
 .playingCard small { position: absolute; right: 5px; bottom: 5px; color: #b47b10; font-size: 9px; }
