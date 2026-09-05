@@ -1,14 +1,14 @@
 :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-synthesis: none; background: #111513; color: #eef2ef; }
 * { box-sizing: border-box; }
-body { margin: 0; background: #111513; }
+body { margin: 0; background: #111513; font-size: 14px; line-height: 1.45; }
 button, textarea { font: inherit; }
 button { cursor: pointer; }
 main { min-height: 100vh; padding: 0 24px 32px; }
 header { max-width: 1320px; height: 64px; margin: auto; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2b332e; }
-header b { font-size: 17px; }
-header span { color: #98a29c; font-size: 13px; }
+header b { font-size: 18px; }
+header span { color: #98a29c; font-size: 14px; }
 header nav { display: flex; gap: 5px; }
-header nav a { padding: 6px 10px; border-radius: 6px; color: #8f9b93; font-size: 12px; text-decoration: none; }
+header nav a { padding: 7px 11px; border-radius: 6px; color: #8f9b93; font-size: 13px; text-decoration: none; }
 header nav a.active { background: #262e29; color: #eef2ef; }
 .trainingIntro { max-width: 1320px; margin: 52px auto 24px; }
 .trainingIntro small { color: #d8aa43; font-size: 10px; letter-spacing: .13em; }
@@ -41,22 +41,22 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .gameArea { padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "deal deal" "order copilot" "table copilot" "error copilot"; gap: 10px 14px; }
 .dealBar { grid-area: deal; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .dealBar > div { display: grid; gap: 3px; }
-.dealBar b { font-size: 14px; }
-.dealBar span, .handLabel span, .dealNotice span { color: #98a29c; font-size: 11px; }
-.turnOrder { grid-area: order; padding: 7px 10px; display: flex; justify-content: center; align-items: center; gap: 9px; border-radius: 7px; background: #141915; color: #7f8a83; font-size: 10px; }
+.dealBar b { font-size: 16px; }
+.dealBar span, .handLabel span, .dealNotice span { color: #98a29c; font-size: 12px; }
+.turnOrder { grid-area: order; padding: 8px 10px; display: flex; justify-content: center; align-items: center; gap: 9px; border-radius: 7px; background: #141915; color: #7f8a83; font-size: 12px; }
 .turnOrder i { color: #59645d; font-style: normal; }
 .turnOrder span.current { padding: 3px 7px; border-radius: 5px; background: #3b311c; color: #efc767; font-weight: 700; }
 .table { grid-area: table; min-height: 620px; position: relative; overflow: hidden; border-radius: 20px; background: radial-gradient(circle at 50% 42%, #286447 0, #20523b 62%, #193f2e 100%); border: 1px solid #397459; box-shadow: inset 0 0 60px #0e2b1d66; }
 .table::after { content: "DANZERO TABLE"; position: absolute; left: 18px; bottom: 14px; color: #bad1c11f; font-size: 11px; font-weight: 800; letter-spacing: .18em; }
 .tableCenter { position: absolute; inset: 41% auto auto 50%; transform: translate(-50%, -50%); display: grid; gap: 5px; text-align: center; }
-.tableCenter b { font-size: 18px; }
-.tableCenter span { color: #a9c4b4; font-size: 12px; }
+.tableCenter b { font-size: 20px; }
+.tableCenter span { color: #a9c4b4; font-size: 13px; }
 .centerCards { max-width: 310px; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .centerCards span { min-width: 34px; padding: 7px 5px; border-radius: 4px; background: #f5f3ed; color: #171a17; font: 750 12px/1 "Helvetica Neue", Arial, sans-serif; }
 .player { position: absolute; display: grid; gap: 3px; min-width: 118px; padding: 11px 12px; border-radius: 12px; background: #143725e8; border: 1px solid #4f7f66; text-align: center; box-shadow: 0 6px 20px #07170f33; }
-.player b { font-size: 13px; }
-.player span { color: #a9c4b4; font-size: 10px; }
-.player em { margin-top: 3px; color: #e0b756; font-size: 9px; font-style: normal; }
+.player b { font-size: 15px; }
+.player span { color: #a9c4b4; font-size: 12px; }
+.player em { margin-top: 3px; color: #e0b756; font-size: 11px; font-style: normal; }
 .player.activePlayer { border-color: #e0b756; box-shadow: 0 0 0 2px #e0b75633; }
 .north { top: 16px; left: 50%; transform: translateX(-50%); }
 .south { bottom: 164px; left: 16px; }
@@ -64,9 +64,9 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .east { right: 16px; top: 38%; transform: translateY(-50%); }
 .history { min-height: 0; padding: 14px; }
 .historyTitle { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
-.historyTitle b { font-size: 12px; }
-.historyTitle b em { margin-left: 6px; padding: 2px 5px; border-radius: 4px; background: #2d332f; color: #9da79f; font-size: 8px; font-style: normal; font-weight: 500; text-transform: uppercase; }
-.historyTitle span { color: #93a097; font-size: 11px; }
+.historyTitle b { font-size: 14px; }
+.historyTitle b em { margin-left: 6px; padding: 2px 5px; border-radius: 4px; background: #2d332f; color: #9da79f; font-size: 10px; font-style: normal; font-weight: 500; text-transform: uppercase; }
+.historyTitle span { color: #93a097; font-size: 12px; }
 .tricks { display: grid; gap: 7px; max-height: 270px; overflow-y: auto; padding-right: 3px; }
 .trick { display: grid; grid-template-columns: 92px 1fr; gap: 8px; }
 .trickMeta { padding: 8px; display: grid; align-content: center; gap: 3px; border-radius: 6px; background: #1d241f; }
@@ -81,14 +81,14 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .playedCards span { min-width: 30px; padding: 5px 4px; border-radius: 4px; background: #f5f3ed; color: #171a17; font: 750 11px/1 "Helvetica Neue", Arial, sans-serif; text-align: center; }
 .playedCards span.red { color: #b42d2d; }
 .actionLog { max-height: 690px; display: grid; align-content: start; gap: 5px; overflow-y: auto; }
-.logRow { min-height: 48px; padding: 7px 8px; display: grid; grid-template-columns: 28px 62px 1fr; align-items: center; gap: 5px; border-radius: 7px; background: #1d241f; font-size: 10px; }
+.logRow { min-height: 52px; padding: 8px; display: grid; grid-template-columns: 30px 68px 1fr; align-items: center; gap: 6px; border-radius: 7px; background: #1d241f; font-size: 12px; }
 .logRow .playedCards { grid-column: 2 / -1; justify-self: start; justify-content: flex-start; }
 .logRow > span { color: #768179; }
 .logRow > em, .logRow > i { color: #d9ad49; font-style: normal; text-transform: capitalize; }
 .tableHand { position: absolute; right: 10px; bottom: 8px; left: 10px; }
 .hand { min-height: 135px; display: flex; align-items: flex-end; justify-content: center; gap: 5px; overflow-x: auto; overflow-y: hidden; padding: 8px 12px 4px; border-radius: 10px; background: #102a1de8; }
 .handLabel { margin: 0 5px 5px; display: flex; align-items: baseline; justify-content: space-between; }
-.handLabel b { font-size: 12px; }
+.handLabel b { font-size: 14px; }
 .cardStack { flex: 0 0 66px; min-width: 66px; display: flex; flex-direction: column; justify-content: flex-end; }
 .cardStack .playingCard + .playingCard { margin-top: -72px; }
 .playingCard { position: relative; flex: 0 0 104px; width: 66px; height: 104px; margin: 0; padding: 9px; display: grid; align-content: start; justify-items: start; border-radius: 7px; border: 2px solid transparent; background: #f5f3ed; color: #161916; box-shadow: 0 -2px 5px #10141155; transition: transform .12s, border-color .12s; }
@@ -114,32 +114,32 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .tableActions button { min-width: 140px; }
 .copilot { grid-area: copilot; min-height: 0; height: 100%; padding: 0; overflow: hidden; border: 1px solid #303a33; border-radius: 10px; background: #141915; }
 .copilotTabs { height: 47px; padding: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; border-bottom: 1px solid #303a33; }
-.copilotTabs button { border: 0; border-radius: 6px; background: transparent; color: #89958d; font-size: 11px; font-weight: 700; }
+.copilotTabs button { border: 0; border-radius: 6px; background: transparent; color: #89958d; font-size: 13px; font-weight: 700; }
 .copilotTabs button.active { background: #28332d; color: #eef2ef; }
 .copilotTabs small { margin-left: 4px; padding: 1px 5px; border-radius: 9px; background: #3a443e; color: #c2cbc5; }
 .coachPanel { max-height: 632px; padding: 14px; display: grid; gap: 14px; overflow-y: auto; }
 .coachPanelHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .coachPanelHead > div { display: grid; gap: 3px; }
-.coachPanelHead b { font-size: 13px; }
-.coachPanelHead span { color: #8e9a92; font-size: 9px; }
-.coachPanelHead button { padding: 6px 8px; font-size: 9px; }
-.coachThinking { padding: 12px; display: flex; gap: 9px; border-radius: 7px; background: #1d241f; color: #b9c4bc; font-size: 10px; line-height: 1.5; }
+.coachPanelHead b { font-size: 15px; }
+.coachPanelHead span { color: #8e9a92; font-size: 11px; line-height: 1.4; }
+.coachPanelHead button { padding: 7px 9px; font-size: 11px; }
+.coachThinking { padding: 12px; display: flex; gap: 9px; border-radius: 7px; background: #1d241f; color: #b9c4bc; font-size: 12px; line-height: 1.5; }
 .coachThinking i { width: 7px; height: 7px; margin-top: 4px; flex: 0 0 auto; border-radius: 50%; background: #d8aa43; box-shadow: 0 0 0 4px #d8aa4322; }
 .coachAnalysis { display: grid; gap: 12px; }
-.analysisLabel { color: #d9ad49; font-size: 9px; font-weight: 700; letter-spacing: .03em; }
+.analysisLabel { color: #d9ad49; font-size: 11px; font-weight: 700; letter-spacing: .03em; }
 .coachAnalysis h3 { margin: -5px 0 0; color: #f0e5c9; font-size: 18px; line-height: 1.35; }
 .coachAnalysis section { padding-top: 11px; border-top: 1px solid #2c352f; }
-.coachAnalysis section b { color: #d9dfdb; font-size: 10px; }
-.coachAnalysis p, .coachAnalysis li { color: #aeb8b1; font-size: 10px; line-height: 1.65; }
+.coachAnalysis section b { color: #d9dfdb; font-size: 13px; }
+.coachAnalysis p, .coachAnalysis li { color: #aeb8b1; font-size: 12px; line-height: 1.65; }
 .coachAnalysis p { margin: 6px 0 0; }
 .coachAnalysis ul { margin: 6px 0 0; }
-.coachEmpty { padding: 48px 18px; color: #87938b; font-size: 11px; line-height: 1.6; text-align: center; }
+.coachEmpty { padding: 48px 18px; color: #87938b; font-size: 13px; line-height: 1.6; text-align: center; }
 .moveFeed { display: grid; gap: 7px; }
 .moveFeed article { padding: 8px; display: grid; gap: 3px; border-radius: 6px; background: #1d241f; }
-.moveFeed article span { color: #d9ad49; font-size: 8px; text-transform: uppercase; }
-.moveFeed article strong { color: #dce2de; font-size: 10px; line-height: 1.45; }
-.moveFeed article p { margin: 0; color: #8f9b93; font-size: 9px; line-height: 1.5; }
-.modelNote { color: #78837c; font-size: 8px; line-height: 1.5; }
+.moveFeed article span { color: #d9ad49; font-size: 10px; text-transform: uppercase; }
+.moveFeed article strong { color: #dce2de; font-size: 13px; line-height: 1.45; }
+.moveFeed article p { margin: 0; color: #8f9b93; font-size: 12px; line-height: 1.55; }
+.modelNote { color: #78837c; font-size: 11px; line-height: 1.5; }
 .coachButtons { display: grid; gap: 7px; }
 .dealNotice { margin-top: 12px; padding: 10px 12px; display: flex; justify-content: space-between; gap: 12px; border-radius: 7px; background: #141915; }
 .dealNotice b { color: #d8aa43; font-size: 11px; }
