@@ -1,6 +1,16 @@
 from opencards_api.app import create_app
 
 
+def advance_to_human(client, deal):
+    while deal["turn"] != "south" and not deal["gameOver"]:
+        response = client.post(f'/v1/games/guandan/deals/{deal["id"]}/ai-actions')
+        assert response.status_code == 200
+        next_deal = response.get_json()
+        assert len(next_deal["history"]) == len(deal["history"]) + 1
+        deal = next_deal
+    return deal
+
+
 def test_health_reports_python_policy_runtime(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENCARDS_DATA_DIR", str(tmp_path))
     client = create_app(testing=True).test_client()
@@ -15,7 +25,7 @@ def test_deal_coach_and_play_contract(tmp_path, monkeypatch):
 
     deal_response = client.post("/v1/games/guandan/deals")
     assert deal_response.status_code == 201
-    deal = deal_response.get_json()
+    deal = advance_to_human(client, deal_response.get_json())
     assert len(deal["yourHand"]) == 27
     assert deal["turn"] == "south"
 
@@ -44,7 +54,7 @@ def test_copilot_chat_receives_live_game_context(tmp_path, monkeypatch):
 
     monkeypatch.setattr("opencards_api.app.ask_copilot", fake_copilot)
     client = create_app(testing=True).test_client()
-    deal = client.post("/v1/games/guandan/deals").get_json()
+    deal = advance_to_human(client, client.post("/v1/games/guandan/deals").get_json())
     response = client.post(
         f'/v1/games/guandan/deals/{deal["id"]}/copilot/messages',
         json={"message": "Why this move?", "conversation": [], "reasoningEffort": "high", "coachingStyle": "socratic"},

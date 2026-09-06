@@ -85,10 +85,12 @@ class PolicyGame:
         self.agents = [HumanAgent(0, random_state)] + [Opponent(i, np.random.RandomState(None if seed is None else seed + i)) for i in range(1, 4)]
         self.env.set_agents(self.agents)
         self.env.reset()
+        self.lock = threading.RLock()
         # A separate learned policy advises the human seat without taking it over.
         self.advisor_seed = seed
-        self._auto_advance()
-        self.lock = threading.RLock()
+        self.advisor = Opponent(0, np.random.RandomState(seed))
+        self._advice_cache_key: int | None = None
+        self._advice_cache_action = None
 
     def view(self) -> dict:
         with self.lock:
@@ -137,9 +139,32 @@ class PolicyGame:
             legal = self._match_action(action, self.env.get_state(0).get("actions", []))
             if legal is None:
                 raise ValueError("动作不合法或已过期，请重新选择")
-            self.env.step(legal)
-            self._auto_advance()
+            next_state, _ = self.env.step(legal)
+            self._sync_advisor_round(next_state)
             return self.view()
+
+    def act_ai(self) -> dict:
+        with self.lock:
+            if self.env.is_over():
+                raise ValueError("牌局已经结束")
+            player = self.env.get_player_id()
+            if player == 0:
+                raise ValueError("当前应由玩家出牌")
+            state = self.env.get_state(player)
+            actions = state.get("actions", [])
+            intent = self.agents[player].step(state) if actions else []
+            legal = self._match_action(intent, actions) if actions else []
+            if actions and legal is None:
+                raise RuntimeError(f"DanZero seat {player} returned an illegal action")
+            next_state, _ = self.env.step(legal)
+            self._sync_advisor_round(next_state)
+            return self.view()
+
+    def _sync_advisor_round(self, next_state: dict) -> None:
+        if next_state.get("round_completed"):
+            self.advisor.reset()
+            self._advice_cache_key = None
+            self._advice_cache_action = None
 
     def copilot_context(self) -> dict:
         with self.lock:
@@ -167,12 +192,22 @@ class PolicyGame:
             if not self._waiting_for_human() or self.env.get_player_id() != 0:
                 raise ValueError("AI 教练只能在你的回合分析")
             state = self.env.get_state(0)
-            # The upstream agent carries per-seat mutable lifecycle state. A
-            # coaching request is observational, so rebuild it from the full
-            # current state instead of leaking state across repeated hints or
-            # across deals in the same match.
-            advisor = get_agent_class("danzero")(0, np.random.RandomState(self.advisor_seed))
-            action = advisor.step(state)
+            # DanZero maintains a model of the other seats across turns. Keep a
+            # dedicated advisor alive for the match, while caching each turn so
+            # repeated hint requests never replay the same observations.
+            cache_key = len(state.get("trace", []))
+            if self._advice_cache_key != cache_key:
+                try:
+                    self._advice_cache_action = self.advisor.step(state)
+                except IndexError:
+                    # Upstream DanZero assumes trace[0] exists after a player
+                    # finishes. A fresh trick violates that assumption; reset
+                    # its private opponent tracker and still run the learned
+                    # value policy on the engine's complete current state.
+                    self.advisor.reset()
+                    self._advice_cache_action = self.advisor.step(state)
+                self._advice_cache_key = cache_key
+            action = self._advice_cache_action
             legal = self._match_action(action, state.get("actions", []))
             if legal is None:
                 raise RuntimeError("DanZero returned an action outside the engine action list")
@@ -203,20 +238,6 @@ class PolicyGame:
         if self.env.is_over() or self.env.get_player_id() != 0:
             return False
         return bool(self.env.get_state(0).get("actions"))
-
-    def _auto_advance(self):
-        for _ in range(100000):
-            if self.env.is_over() or self._waiting_for_human():
-                return
-            player = self.env.get_player_id()
-            state = self.env.get_state(player)
-            actions = state.get("actions", [])
-            action = self.agents[player].step(state) if actions else []
-            legal = self._match_action(action, actions) if actions else []
-            if actions and legal is None:
-                raise RuntimeError(f"DanZero seat {player} returned an illegal action")
-            self.env.step(legal)
-        raise RuntimeError("game auto-advance guard exceeded")
 
     @staticmethod
     def _match_action(intent, legal_actions):

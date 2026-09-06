@@ -62,6 +62,18 @@ def create_app(testing: bool = False) -> Flask:
         except ValueError as exc:
             return error(str(exc), 422)
 
+    @app.post("/v1/games/guandan/deals/<game_id>/ai-actions")
+    def play_ai(game_id):
+        game = games.get(game_id)
+        if not game:
+            return error("game not found", 404)
+        try:
+            return jsonify(game.act_ai())
+        except ValueError as exc:
+            return error(str(exc), 409)
+        except RuntimeError as exc:
+            return error(str(exc), 502)
+
     @app.post("/v1/games/guandan/deals/<game_id>/coach")
     def coach_game(game_id):
         game = games.get(game_id)

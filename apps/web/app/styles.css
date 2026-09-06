@@ -58,6 +58,18 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .player span { color: #a9c4b4; font-size: 12px; }
 .player em { margin-top: 3px; color: #e0b756; font-size: 11px; font-style: normal; }
 .player.activePlayer { border-color: #e0b756; box-shadow: 0 0 0 2px #e0b75633; }
+.seatPlay { z-index: 4; min-width: 52px; display: flex; justify-content: center; gap: 3px; animation: seat-play-in .28s ease-out both; }
+.seatPlay span { min-width: 34px; padding: 7px 5px; border-radius: 4px; background: #f5f3ed; color: #171a17; font: 750 12px/1 "Helvetica Neue", Arial, sans-serif; box-shadow: 0 5px 12px #06150d55; }
+.seatPlay span.red { color: #b42d2d; }
+.seatPlay span.gold { color: #a8740d; }
+.seatPlay span.silver { color: #707a80; }
+.seatPlay > i { padding: 7px 12px; border-radius: 14px; background: #122c20d9; color: #a9c4b4; font-size: 11px; font-style: normal; white-space: nowrap; }
+.player .seatPlay { position: absolute; }
+.north .seatPlay { top: calc(100% + 14px); left: 50%; transform: translateX(-50%); }
+.west .seatPlay { top: 50%; left: calc(100% + 14px); transform: translateY(-50%); }
+.east .seatPlay { top: 50%; right: calc(100% + 14px); transform: translateY(-50%); }
+.southPlay { position: absolute; right: 382px; bottom: 218px; left: 18px; }
+@keyframes seat-play-in { from { opacity: 0; scale: .92; filter: blur(2px); } to { opacity: 1; scale: 1; filter: blur(0); } }
 .north { top: 126px; left: 44%; transform: translateX(-50%); }
 .south { display: none; }
 .west { left: 16px; top: 38%; transform: translateY(-50%); }
@@ -153,6 +165,12 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .chatMessage { max-width: 92%; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
 .chatMessage.user { justify-self: end; background: #d8aa43; color: #1c180f; }
 .chatMessage.assistant { justify-self: start; background: #242d27; color: #d8dfda; }
+.chatMessage > :first-child { margin-top: 0; }
+.chatMessage > :last-child { margin-bottom: 0; }
+.chatMessage p { margin: 0 0 7px; }
+.chatMessage ul, .chatMessage ol { margin: 5px 0 8px; padding-left: 18px; }
+.chatMessage li + li { margin-top: 3px; }
+.chatMessage code { padding: 1px 4px; border-radius: 3px; background: #111713; color: #efc767; font-size: .92em; }
 .copilotComposer { position: absolute; right: 12px; bottom: 12px; left: 12px; padding: 10px 10px 9px 13px; display: grid; grid-template-columns: 1fr 36px; gap: 8px; align-items: end; border: 1px solid #435047; border-radius: 15px; background: #19211cfa; box-shadow: 0 10px 28px #050b0780, inset 0 1px #ffffff08; transition: border-color .15s, box-shadow .15s; }
 .copilotComposer:focus-within { border-color: #b58a32; box-shadow: 0 12px 32px #050b0799, 0 0 0 3px #d8aa4318; }
 .copilotComposer textarea { min-width: 0; min-height: 38px; max-height: 110px; resize: none; padding: 5px 0; border: 0; outline: 0; background: transparent; color: #eef2ef; font-size: 13px; line-height: 1.45; }
@@ -195,6 +213,6 @@ ul { padding-left: 18px; line-height: 1.5; }
 .feedback textarea { resize: vertical; padding: 9px; border: 1px solid #3c4941; border-radius: 6px; background: #111513; color: #eef2ef; }
 .feedback button { margin-top: 9px; padding: 7px 10px; border: 1px solid #46534b; border-radius: 6px; background: transparent; color: #dce2de; }
 .feedback small { display: block; margin-top: 7px; color: #98a39c; }
-@media (max-width: 1080px) { .workspace { grid-template-columns: minmax(0, 1fr); } header { right: 320px; } .east { right: 330px; } .tableHand { right: 330px; } .copilot { width: 320px; } .gameSettings { right: 332px; } .history { padding: 14px; } .actionLog { max-height: none; } .empty { padding: 55px 22px; } }
+@media (max-width: 1080px) { .workspace { grid-template-columns: minmax(0, 1fr); } header { right: 320px; } .east { right: 330px; } .tableHand, .southPlay { right: 330px; } .copilot { width: 320px; } .gameSettings { right: 332px; } .history { padding: 14px; } .actionLog { max-height: none; } .empty { padding: 55px 22px; } }
 @media (max-width: 820px) { .trick { grid-template-columns: 1fr; } .trickMeta { grid-template-columns: 1fr auto; } .turns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 680px) { header { right: 0; height: 56px; padding-inline: 12px; } header > span { display: none; } header nav a { padding-inline: 8px; } .trainingIntro { margin-top: 32px; } .importPanel form { grid-template-columns: 1fr auto; } .importPanel form > div { grid-column: 1 / -1; } .jobStatus { grid-template-columns: auto auto 1fr; } .jobStatus progress { width: 100%; } .jobStatus > span:nth-of-type(2), .jobStatus em { grid-column: 2 / -1; } .dealBar { top: 64px; left: 10px; } .dealBar span, .turnOrder { display: none; } .table { min-height: 100vh; } .player { min-width: 92px; padding: 8px; } .east { right: 10px; } .north { top: 112px; left: 50%; } .tableCenter { left: 50%; } .tableActions button { min-width: 105px; } .tableHand { right: 8px; left: 8px; } .hand { justify-content: flex-start; padding-inline: 4px; } .cardStack { flex-basis: 56px; min-width: 56px; } .playingCard { width: 56px; height: 92px; flex-basis: 92px; } .cardStack .playingCard + .playingCard { margin-top: -62px; } .copilot { top: auto; right: 0; bottom: 0; left: 0; width: auto; height: 48vh; border-top: 1px solid #344038; border-left: 0; } .gameSettings { top: 58px; right: 10px; width: min(290px, calc(100vw - 20px)); } .actions { grid-template-columns: 1fr; } .primary { width: 100%; } }
+@media (max-width: 680px) { header { right: 0; height: 56px; padding-inline: 12px; } header > span { display: none; } header nav a { padding-inline: 8px; } .trainingIntro { margin-top: 32px; } .importPanel form { grid-template-columns: 1fr auto; } .importPanel form > div { grid-column: 1 / -1; } .jobStatus { grid-template-columns: auto auto 1fr; } .jobStatus progress { width: 100%; } .jobStatus > span:nth-of-type(2), .jobStatus em { grid-column: 2 / -1; } .dealBar { top: 64px; left: 10px; } .dealBar span, .turnOrder { display: none; } .table { min-height: 100vh; } .player { min-width: 92px; padding: 8px; } .east { right: 10px; } .north { top: 112px; left: 50%; } .tableCenter { left: 50%; } .southPlay { right: 8px; bottom: 200px; left: 8px; } .tableActions button { min-width: 105px; } .tableHand { right: 8px; left: 8px; } .hand { justify-content: flex-start; padding-inline: 4px; } .cardStack { flex-basis: 56px; min-width: 56px; } .playingCard { width: 56px; height: 92px; flex-basis: 92px; } .cardStack .playingCard + .playingCard { margin-top: -62px; } .copilot { top: auto; right: 0; bottom: 0; left: 0; width: auto; height: 48vh; border-top: 1px solid #344038; border-left: 0; } .gameSettings { top: 58px; right: 10px; width: min(290px, calc(100vw - 20px)); } .actions { grid-template-columns: 1fr; } .primary { width: 100%; } }

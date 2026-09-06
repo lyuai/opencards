@@ -3,6 +3,8 @@ from opencards_api.game import PolicyGame
 
 def test_danzero_advice_is_an_engine_legal_action():
     game = PolicyGame(seed=42)
+    while game.view()["turn"] != "south":
+        game.act_ai()
     before = game.view()
     advice = game.advise()
 
@@ -21,8 +23,11 @@ def test_complete_match_reaches_a_real_engine_result():
     game = PolicyGame(seed=7)
     decisions = 0
     while not game.env.is_over() and decisions < 10000:
-        advice = game.advise()
-        game.act(advice["cardIds"], not advice["cardIds"])
+        if game.view()["turn"] == "south":
+            advice = game.advise()
+            game.act(advice["cardIds"], not advice["cardIds"])
+        else:
+            game.act_ai()
         decisions += 1
 
     assert decisions < 10000

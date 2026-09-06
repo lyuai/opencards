@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 type Card = { id: string; rank: string; suit: string };
 type Combo = { type: string; size: number; power: number };
@@ -41,10 +42,12 @@ export function CoachLab() {
   const [reasoningEffort, setReasoningEffort] = useState("medium");
   const [coachingStyle, setCoachingStyle] = useState("detailed");
   const [error, setError] = useState("");
+  const [seatPlays, setSeatPlays] = useState<Partial<Record<Game["turn"], Action>>>({});
+  const [aiThinkingSeat, setAIThinkingSeat] = useState<Game["turn"] | null>(null);
   const coachPanelRef = useRef<HTMLDivElement>(null);
 
   const dealCards = useCallback(async () => {
-    setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]);
+    setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]); setSeatPlays({});
     try {
       const response = await fetch(`${api}/v1/games/guandan/deals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ opponentPolicy: "danzero", seed: dealSeed === "" ? null : Number(dealSeed) }) });
       const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Could not deal cards"); setGame(body); void requestCoach(body);
@@ -60,6 +63,37 @@ export function CoachLab() {
     });
     return () => cancelAnimationFrame(frame);
   }, [chatMessages, chatLoading, copilotTab]);
+  useEffect(() => {
+    if (!game || game.gameOver || game.turn === "south") {
+      setAIThinkingSeat(null);
+      return;
+    }
+    let cancelled = false;
+    const actingSeat = game.turn;
+    setAIThinkingSeat(actingSeat);
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/ai-actions`, { method: "POST" });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? "AI action failed");
+        if (cancelled) return;
+        placeLatestAction(game, body);
+        setGame(body);
+        if (body.turn === "south") void requestCoach(body);
+      } catch (caught) {
+        if (!cancelled) setError(caught instanceof Error ? caught.message : "AI action failed");
+      } finally {
+        if (!cancelled) setAIThinkingSeat(null);
+      }
+    }, 850);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [api, game?.id, game?.history.length, game?.turn]);
+
+  function placeLatestAction(previous: Game, next: Game) {
+    const action = next.history.at(-1);
+    if (!action) return;
+    setSeatPlays((current) => ({ ...(previous.currentPlay ? current : {}), [action.seat]: action }));
+  }
 
   async function act(pass: boolean, cards: string[] = selected) {
     if (!game) return; setLoading(true); setError("");
@@ -68,7 +102,7 @@ export function CoachLab() {
       const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardIds: pass ? [] : cards, pass }) });
       const body = await response.json();
       if (response.status === 404 && body.error === "game not found") { await dealCards(); setError("The previous game expired after a server restart, so a new hand was dealt."); return; }
-      if (!response.ok) throw new Error(body.error ?? "Illegal action"); setGame(body); setSelected([]); setAIAdvice(null); void requestCoach(body);
+      if (!response.ok) throw new Error(body.error ?? "Illegal action"); placeLatestAction(game, body); setGame(body); setSelected([]); setAIAdvice(null); void requestCoach(body);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Illegal action"); }
     finally { setLoading(false); }
   }
@@ -111,10 +145,11 @@ export function CoachLab() {
     <header><nav><Link className="active" href="/">Arena</Link><Link href="/training">Training</Link></nav><button className="settingsToggle" aria-label="Game settings" aria-expanded={settingsOpen} onClick={()=>setSettingsOpen((open)=>!open)}>⚙</button></header>
     <div className="playWorkspace">
       <section className={`gameArea ${compactCards ? "compactCards" : ""}`} aria-label="Guandan card table">
-        <div className="dealBar"><b>{game?.gameOver ? "Game over" : yourTurn ? "Your turn" : `${seatLabels[game?.turn ?? ""] ?? "AI"} to play`}</b><button className="secondary" type="button" disabled={loading} onClick={dealCards}>New Deal</button></div>
+        <div className="dealBar"><b>{game?.gameOver ? "Game over" : yourTurn ? "Your turn" : `${seatLabels[game?.turn ?? ""] ?? "AI"} ${aiThinkingSeat ? "is thinking" : "to play"}`}</b><button className="secondary" type="button" disabled={loading || Boolean(aiThinkingSeat)} onClick={dealCards}>New Deal</button></div>
         <div className="table">
-          {seats.map((seat) => <Player key={seat.id} className={seat.className} label={seat.label} role={seat.role} count={game?.counts[seat.id] ?? 0} active={game?.turn === seat.id}/>) }
-          <div className="tableCenter"><b>{game?.currentPlay ? comboLabel(game.currentPlay.combination?.type) : "Lead any legal play"}</b><div className="centerCards">{game?.currentPlay?.cards?.map((card) => <MiniCard card={card} key={card.id}/>)}</div><span>{game?.currentPlay ? `${seatLabels[game.currentPlay.seat]} played` : "Fresh trick"}</span></div>
+          {seats.map((seat) => <Player key={seat.id} className={seat.className} label={seat.label} role={seat.role} count={game?.counts[seat.id] ?? 0} active={game?.turn === seat.id} thinking={aiThinkingSeat === seat.id} action={seatPlays[seat.id]}/>) }
+          <SeatPlay action={seatPlays.south} className="southPlay" />
+          <div className="tableCenter"><b>{game?.currentPlay ? comboLabel(game.currentPlay.combination?.type) : "Lead any legal play"}</b><span>{game?.currentPlay ? `${seatLabels[game.currentPlay.seat]} controls the trick` : "Fresh trick"}</span></div>
           <div className="tableHand"><div className="tableActions"><button className="secondary" disabled={!yourTurn || loading || !game?.currentPlay} onClick={() => void act(true)}>Pass</button><button className="primary" disabled={!yourTurn || loading || selected.length === 0} onClick={() => void act(false)}>{loading ? "Playing…" : "Play Selected"}</button></div><div className="hand" aria-label="Your hand">{handGroups.map((cards) => <div className="cardStack" key={cards[0].rank}>{cards.map((card) => <CardButton card={card} wild={card.rank === game?.levelRank && card.suit === "♥"} recommended={aiAdvice?.cardIds.includes(card.id) ?? false} selected={selected.includes(card.id)} key={card.id} onClick={() => yourTurn && setSelected((current) => current.includes(card.id) ? current.filter((id) => id !== card.id) : [...current, card.id])}/>)}</div>)}</div></div>
         </div>
         {error && <p className="error">{error}</p>}
@@ -123,7 +158,7 @@ export function CoachLab() {
           {copilotTab === "coach" ? <div className="coachPanel" ref={coachPanelRef}>
             {coachLoading && !aiAdvice && <div className="coachThinking"><i/><span>Enumerating legal moves, comparing policy values, and reading the table…</span></div>}
             {aiAdvice ? <div className="coachAnalysis"><section className="moveFeed">{aiAdvice.moveAnalyses.map((item)=><article key={item.index}><span>#{item.index} · {seatLabels[item.seat]}</span><strong>{item.summary}</strong><p>{item.impact}</p></article>)}</section><span className="analysisLabel">{aiAdvice.confidence > 0 ? `${Math.round(aiAdvice.confidence * 100)}% CONFIDENCE` : "UNCALIBRATED POLICY PICK"}</span><h3>{aiAdvice.cardIds.length===0?"Pass this turn":`Play ${coachCards.map(cardText).join(" ")}`}</h3><div className="recommendedCards">{coachCards.map((card)=><MiniCard card={card} key={card.id}/>)}</div><section><p>{aiAdvice.rationale}</p></section>{aiAdvice.alternatives.length > 0 && <section><ul>{aiAdvice.alternatives.map((item)=><li key={item}>{item}</li>)}</ul></section>}{aiAdvice.assumptions.length > 0 && <section><ul>{aiAdvice.assumptions.map((item)=><li key={item}>{item}</li>)}</ul></section>}<small className="modelNote">Powered by DanZero</small></div> : !coachLoading && <div className="coachEmpty"><button className="secondary" onClick={()=>void askAICoach()}>Analyze this turn</button></div>}
-            <div className="chatThread">{chatMessages.map((item, index)=><div className={`chatMessage ${item.role}`} key={index}>{item.content}</div>)}{chatLoading && <div className="chatMessage assistant">Thinking…</div>}</div>
+            <div className="chatThread">{chatMessages.map((item, index)=><div className={`chatMessage ${item.role}`} key={index}>{item.role === "assistant" ? <ReactMarkdown>{item.content}</ReactMarkdown> : item.content}</div>)}{chatLoading && <div className="chatMessage assistant">Thinking…</div>}</div>
             {aiAdvice && <div className="coachQuickActions">{aiAdvice.cardIds.length===0?<button className="primary" onClick={()=>void act(true)}>Follow: Pass</button>:<><button className="secondary" onClick={()=>setSelected(aiAdvice.cardIds)}>Highlight</button><button className="primary" onClick={()=>void act(false,aiAdvice.cardIds)}>Play This Move</button></>}</div>}
             <form className="copilotComposer" onSubmit={(event)=>{event.preventDefault(); void sendCopilotMessage();}}><textarea aria-label="Ask Arena Copilot" rows={2} value={chatDraft} onChange={(event)=>setChatDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();void sendCopilotMessage();}}} placeholder="Ask about this position…"/><button type="submit" aria-label="Send message" disabled={!chatDraft.trim()||chatLoading}>↑</button></form>
           </div> : <section className="history" aria-label="Complete play history"><div className="actionLog">{game?.history.map((action) => <div className="logRow" key={action.index}><span>#{action.index}</span><b>{seatLabels[action.seat]}</b>{action.kind === "pass" ? <i>Pass</i> : <><em>{comboLabel(action.combination?.type)}</em><div className="playedCards">{action.cards?.map((card) => <MiniCard card={card} key={card.id}/>)}</div></>}</div>)}</div></section>}
@@ -134,7 +169,8 @@ export function CoachLab() {
   </main>;
 }
 
-function Player({ className, label, role, count, active }: { className: string; label: string; role: string; count: number; active: boolean }) { return <div className={`player ${className} ${active ? "activePlayer" : ""}`}><b>{label}</b><span>{count} cards</span><em>{active ? "Playing" : role}</em></div>; }
+function Player({ className, label, role, count, active, thinking, action }: { className: string; label: string; role: string; count: number; active: boolean; thinking: boolean; action?: Action }) { return <div className={`player ${className} ${active ? "activePlayer" : ""}`}><b>{label}</b><span>{count} cards</span><em>{thinking ? "Thinking…" : active ? "Playing" : role}</em><SeatPlay action={action}/></div>; }
+function SeatPlay({ action, className = "" }: { action?: Action; className?: string }) { if (!action) return null; return <div className={`seatPlay ${className}`} key={action.index}>{action.kind === "pass" ? <i>Pass</i> : action.cards?.map((card)=><MiniCard card={card} key={card.id}/>)}</div>; }
 function CardButton({ card, wild, recommended, selected, onClick }: { card: Card; wild: boolean; recommended: boolean; selected: boolean; onClick: () => void }) { const red=card.suit==="♥"||card.suit==="♦", joker=card.suit==="★", goldJoker=joker&&card.rank==="RJ"; return <button type="button" aria-pressed={selected} aria-label={`${card.rank} ${card.suit}${wild ? " wild card" : ""}`} className={`playingCard ${red?"red":""} ${joker?"joker":""} ${goldJoker?"goldJoker":""} ${wild?"wild":""} ${recommended?"recommended":""}`} onClick={onClick}><span>{joker?"JOKER":card.rank}</span><i>{joker?(goldJoker?"★":"☆"):card.suit}</i>{wild?<small>WILD</small>:joker&&<small>{goldJoker?"GOLD":"SILVER"}</small>}</button>; }
 function MiniCard({ card }: { card: Card }) { const jokerTone=card.rank==="RJ"?"gold":card.rank==="BJ"?"silver":""; return <span className={jokerTone||((card.suit==="♥"||card.suit==="♦")?"red":"")}>{card.suit==="★"?`${card.rank}★`:`${card.rank}${card.suit}`}</span>; }
 function cardText(card: Card) { return `${card.rank}${card.suit}`; }
