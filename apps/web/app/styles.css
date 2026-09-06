@@ -88,12 +88,12 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .logRow > span { color: #768179; }
 .logRow > em, .logRow > i { color: #d9ad49; font-style: normal; text-transform: capitalize; }
 .tableHand { position: absolute; right: 382px; bottom: 12px; left: 18px; display: grid; gap: 8px; }
-.hand { min-height: 135px; display: flex; align-items: flex-end; justify-content: center; gap: 5px; overflow-x: auto; overflow-y: hidden; padding: 8px 12px 4px; }
+.hand { min-height: 135px; display: flex; align-items: flex-end; justify-content: center; gap: 3px; overflow-x: auto; overflow-y: hidden; padding: 8px 12px 4px; }
 .handLabel { margin: 0 5px 5px; display: flex; align-items: baseline; justify-content: space-between; }
 .handLabel b { font-size: 14px; }
-.cardStack { flex: 0 0 66px; min-width: 66px; display: flex; flex-direction: column; justify-content: flex-end; }
+.cardStack { flex: 1 1 54px; min-width: 46px; max-width: 66px; display: flex; flex-direction: column; justify-content: flex-end; }
 .cardStack .playingCard + .playingCard { margin-top: -72px; }
-.playingCard { position: relative; flex: 0 0 104px; width: 66px; height: 104px; margin: 0; padding: 9px; display: grid; align-content: start; justify-items: start; border-radius: 7px; border: 2px solid transparent; background: #f5f3ed; color: #161916; box-shadow: 0 -2px 5px #10141155; transition: transform .12s, border-color .12s; }
+.playingCard { position: relative; flex: 0 0 104px; width: 100%; height: 104px; margin: 0; padding: 9px; display: grid; align-content: start; justify-items: start; border-radius: 7px; border: 2px solid transparent; background: #f5f3ed; color: #161916; box-shadow: 0 -2px 5px #10141155; transition: transform .12s, border-color .12s; }
 .playingCard:hover { transform: translateY(-3px); }
 .playingCard[aria-pressed="true"] { transform: translateY(-7px); border-color: #e0ad3f; }
 .playingCard span { font: 750 20px/1 "Helvetica Neue", Arial, sans-serif; letter-spacing: -.02em; }
