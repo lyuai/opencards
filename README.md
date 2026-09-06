@@ -58,12 +58,18 @@ Then open <http://localhost:3000>. The API listens on
 
 ## AI coaching prototype
 
+Copy `.env.example` to the ignored `.env.local` and add a server-side provider
+key before starting the API. The Python service loads the root `.env.local` and
+`.env` files; existing process environment variables take precedence. Never use a
+`NEXT_PUBLIC_` variable for the provider key because that would expose it to the
+browser.
+
 The authoritative game and legal action list come from `rlcard-guandan`. All three
 computer seats and the hint endpoint use its bundled pretrained DanZero Deep Monte
 Carlo value network. The hint is matched back to the engine's exact `actionList`;
 an out-of-list model action is rejected. No LLM or hand-written opening rule chooses
-the move. Future language-model calls may explain the policy output, but cannot
-replace it or invent a confidence score.
+the move. Arena Copilot uses the configured OpenAI-compatible Responses API to
+explain the policy output, but cannot replace it or invent a confidence score.
 
 Run `npm run test:api` to execute both our HTTP/full-match regression suite and the
 pinned upstream engine suite.

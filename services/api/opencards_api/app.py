@@ -5,10 +5,16 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from dotenv import load_dotenv
 
 from .copilot import ask_copilot
 from .game import GameStore
 from .store import JobStore
+
+
+PROJECT_ROOT = Path(__file__).parents[3]
+load_dotenv(PROJECT_ROOT / ".env.local", override=False)
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 
 def create_app(testing: bool = False) -> Flask:
