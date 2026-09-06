@@ -79,7 +79,7 @@ def create_app(testing: bool = False) -> Flask:
         if not message:
             return error("message is required", 400)
         try:
-            return jsonify(ask_copilot(game.copilot_context(), game.advise(), message, body.get("conversation") or []))
+            return jsonify(ask_copilot(game.copilot_context(), game.advise(), message, body.get("conversation") or [], body.get("reasoningEffort", "medium"), body.get("coachingStyle", "detailed")))
         except ValueError as exc:
             return error(str(exc), 409)
         except RuntimeError as exc:

@@ -34,22 +34,23 @@ export function CoachLab() {
   const [chatDraft, setChatDraft] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [opponentPolicy, setOpponentPolicy] = useState("danzero");
   const [dealSeed, setDealSeed] = useState("");
   const [autoCoach, setAutoCoach] = useState(true);
   const [confirmPlay, setConfirmPlay] = useState(false);
   const [compactCards, setCompactCards] = useState(false);
+  const [reasoningEffort, setReasoningEffort] = useState("medium");
+  const [coachingStyle, setCoachingStyle] = useState("detailed");
   const [error, setError] = useState("");
 
   const dealCards = useCallback(async () => {
     setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]);
     try {
-      const response = await fetch(`${api}/v1/games/guandan/deals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ opponentPolicy, seed: dealSeed === "" ? null : Number(dealSeed) }) });
+      const response = await fetch(`${api}/v1/games/guandan/deals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ opponentPolicy: "danzero", seed: dealSeed === "" ? null : Number(dealSeed) }) });
       const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Could not deal cards"); setGame(body); void requestCoach(body);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not deal cards"); }
     finally { setLoading(false); }
-  }, [api, autoCoach, dealSeed, opponentPolicy]);
-  useEffect(() => { void dealCards(); }, []); // Deal once; settings apply explicitly through Apply & Deal.
+  }, [api, autoCoach, dealSeed]);
+  useEffect(() => { void dealCards(); }, []); // Deal once; the current settings apply to later actions and deals.
 
   async function act(pass: boolean, cards: string[] = selected) {
     if (!game) return; setLoading(true); setError("");
@@ -81,7 +82,7 @@ export function CoachLab() {
     const nextMessages: ChatMessage[] = [...chatMessages, { role: "user", content: clean }];
     setChatMessages(nextMessages); setChatDraft(""); setChatLoading(true);
     try {
-      const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/copilot/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: clean, conversation: chatMessages }) });
+      const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/copilot/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: clean, conversation: chatMessages, reasoningEffort, coachingStyle }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Copilot unavailable");
       setChatMessages([...nextMessages, { role: "assistant", content: body.content }]);
@@ -117,7 +118,7 @@ export function CoachLab() {
             <form className="copilotComposer" onSubmit={(event)=>{event.preventDefault(); void sendCopilotMessage();}}><textarea aria-label="Ask Arena Copilot" rows={2} value={chatDraft} onChange={(event)=>setChatDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();void sendCopilotMessage();}}} placeholder="Ask about this position…"/><button type="submit" aria-label="Send message" disabled={!chatDraft.trim()||chatLoading}>↑</button></form>
           </div> : <section className="history" aria-label="Complete play history"><div className="actionLog">{game?.history.map((action) => <div className="logRow" key={action.index}><span>#{action.index}</span><b>{seatLabels[action.seat]}</b>{action.kind === "pass" ? <i>Pass</i> : <><em>{comboLabel(action.combination?.type)}</em><div className="playedCards">{action.cards?.map((card) => <MiniCard card={card} key={card.id}/>)}</div></>}</div>)}</div></section>}
         </aside>
-        {settingsOpen && <section className="gameSettings" aria-label="Game settings"><label>Opponents<select value={opponentPolicy} onChange={(event)=>setOpponentPolicy(event.target.value)}><option value="danzero">DanZero · Expert</option><option value="base1">Competition Base1 · Intermediate</option><option value="random">Random · Beginner</option></select></label><label>Replay seed<input inputMode="numeric" value={dealSeed} onChange={(event)=>setDealSeed(event.target.value.replace(/\D/g,""))} placeholder="Random"/></label><label><input type="checkbox" checked={autoCoach} onChange={(event)=>setAutoCoach(event.target.checked)}/>Automatic coaching</label><label><input type="checkbox" checked={confirmPlay} onChange={(event)=>setConfirmPlay(event.target.checked)}/>Confirm before playing</label><label><input type="checkbox" checked={compactCards} onChange={(event)=>setCompactCards(event.target.checked)}/>Compact hand</label><button className="primary" onClick={()=>{setSettingsOpen(false);void dealCards();}}>Apply & Deal</button></section>}
+        {settingsOpen && <section className="gameSettings" aria-label="Game settings"><label>Coach reasoning<select value={reasoningEffort} onChange={(event)=>setReasoningEffort(event.target.value)}><option value="low">Fast</option><option value="medium">Balanced</option><option value="high">Deep</option></select></label><label>Coaching style<select value={coachingStyle} onChange={(event)=>setCoachingStyle(event.target.value)}><option value="direct">Direct</option><option value="detailed">Detailed</option><option value="socratic">Socratic</option></select></label><label>Replay seed<input inputMode="numeric" value={dealSeed} onChange={(event)=>setDealSeed(event.target.value.replace(/\D/g,""))} placeholder="Random"/></label><label><input type="checkbox" checked={autoCoach} onChange={(event)=>{setAutoCoach(event.target.checked);if(!event.target.checked)setAIAdvice(null);}}/>Automatic coaching</label><label><input type="checkbox" checked={confirmPlay} onChange={(event)=>setConfirmPlay(event.target.checked)}/>Confirm before playing</label><label><input type="checkbox" checked={compactCards} onChange={(event)=>setCompactCards(event.target.checked)}/>Compact hand</label><button className="primary" onClick={()=>setSettingsOpen(false)}>Done</button></section>}
       </section>
     </div>
   </main>;

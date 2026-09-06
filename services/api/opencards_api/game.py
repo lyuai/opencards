@@ -78,8 +78,8 @@ class PolicyGame:
         self.human_player_ids = [0]
         self.env = guandan_rlcard.make({"seed": seed, "perfect_info": False})
         random_state = np.random.RandomState(seed)
-        if opponent_policy not in {"random", "base1", "danzero"}:
-            raise ValueError("opponentPolicy must be random, base1, or danzero")
+        if opponent_policy != "danzero":
+            raise ValueError("only the pretrained DanZero opponent is currently available")
         Opponent = get_agent_class(opponent_policy)
         self.opponent_policy = opponent_policy
         self.agents = [HumanAgent(0, random_state)] + [Opponent(i, np.random.RandomState(None if seed is None else seed + i)) for i in range(1, 4)]

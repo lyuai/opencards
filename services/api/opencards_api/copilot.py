@@ -10,7 +10,7 @@ SYSTEM_PROMPT = """You are Arena Copilot, an expert Guandan coach.
 Answer the player's question using the supplied live game state. Explain strategic tradeoffs clearly and distinguish facts, inferences, and uncertainty. Never invent hidden cards, model scores, or legal moves. When comparing an alternative play, verify it against legal context when available. Be concise but specific."""
 
 
-def ask_copilot(game_state: dict, recommendation: dict, message: str, conversation: list[dict]) -> dict:
+def ask_copilot(game_state: dict, recommendation: dict, message: str, conversation: list[dict], reasoning_effort: str = "medium", coaching_style: str = "detailed") -> dict:
     api_key = os.getenv("AI_API_KEY") or os.getenv("OPENAI_API_KEY")
     model = os.getenv("AI_MODEL") or os.getenv("OPENAI_MODEL")
     base_url = os.getenv("AI_BASE_URL") or os.getenv("OPENAI_BASE_URL")
@@ -34,11 +34,21 @@ def ask_copilot(game_state: dict, recommendation: dict, message: str, conversati
         for item in conversation[-12:]
         if item.get("role") in {"user", "assistant"} and item.get("content")
     ]
+    if reasoning_effort not in {"low", "medium", "high"}:
+        raise RuntimeError("reasoningEffort must be low, medium, or high")
+    styles = {
+        "direct": "Lead with the recommended move and keep the explanation compact.",
+        "detailed": "Explain the move, alternatives, risks, and likely follow-up play in detail.",
+        "socratic": "Coach by asking one useful question, then explain the key strategic idea.",
+    }
+    if coaching_style not in styles:
+        raise RuntimeError("coachingStyle must be direct, detailed, or socratic")
     response = client.responses.create(
         model=model,
-        instructions=SYSTEM_PROMPT,
+        instructions=SYSTEM_PROMPT + "\n" + styles[coaching_style],
+        reasoning={"effort": reasoning_effort},
         input=[{"role": "developer", "content": "Live game state:\n" + json.dumps(context, ensure_ascii=False)}]
         + dialogue
         + [{"role": "user", "content": message}],
     )
-    return {"content": response.output_text, "provider": os.getenv("AI_PROVIDER", model), "responseId": response.id}
+    return {"content": response.output_text, "provider": os.getenv("AI_PROVIDER", model), "responseId": response.id, "reasoningEffort": reasoning_effort, "coachingStyle": coaching_style}
