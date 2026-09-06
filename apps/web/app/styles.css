@@ -123,7 +123,7 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .copilotTabs button { border: 0; border-radius: 6px; background: transparent; color: #89958d; font-size: 13px; font-weight: 700; }
 .copilotTabs button.active { background: #28332d; color: #eef2ef; }
 .copilotTabs small { margin-left: 4px; padding: 1px 5px; border-radius: 9px; background: #3a443e; color: #c2cbc5; }
-.coachPanel { height: calc(100% - 47px); padding: 16px 16px 92px; display: grid; align-content: start; gap: 14px; overflow-y: auto; scrollbar-width: none; }
+.coachPanel { height: calc(100% - 47px); padding: 16px 16px 146px; display: grid; align-content: start; gap: 14px; overflow-y: auto; scrollbar-width: none; }
 .coachPanel::-webkit-scrollbar, .actionLog::-webkit-scrollbar { display: none; }
 .coachPanelHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .coachPanelHead > div { display: grid; gap: 3px; }
@@ -147,7 +147,8 @@ header nav a.active { background: #262e29; color: #eef2ef; }
 .moveFeed article strong { color: #dce2de; font-size: 13px; line-height: 1.45; }
 .moveFeed article p { margin: 0; color: #8f9b93; font-size: 12px; line-height: 1.55; }
 .modelNote { color: #78837c; font-size: 11px; line-height: 1.5; }
-.coachButtons { display: grid; gap: 7px; }
+.coachQuickActions { position: absolute; z-index: 2; right: 12px; bottom: 84px; left: 12px; padding-top: 10px; display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 7px; background: linear-gradient(180deg, transparent, #101612 28%); }
+.coachQuickActions > button:only-child { grid-column: 1 / -1; }
 .chatThread { display: grid; gap: 8px; }
 .chatMessage { max-width: 92%; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
 .chatMessage.user { justify-self: end; background: #d8aa43; color: #1c180f; }
