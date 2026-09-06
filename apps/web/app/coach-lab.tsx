@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Card = { id: string; rank: string; suit: string };
 type Combo = { type: string; size: number; power: number };
@@ -41,6 +41,7 @@ export function CoachLab() {
   const [reasoningEffort, setReasoningEffort] = useState("medium");
   const [coachingStyle, setCoachingStyle] = useState("detailed");
   const [error, setError] = useState("");
+  const coachPanelRef = useRef<HTMLDivElement>(null);
 
   const dealCards = useCallback(async () => {
     setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]);
@@ -51,6 +52,14 @@ export function CoachLab() {
     finally { setLoading(false); }
   }, [api, autoCoach, dealSeed]);
   useEffect(() => { void dealCards(); }, []); // Deal once; the current settings apply to later actions and deals.
+  useEffect(() => {
+    if (copilotTab !== "coach" || (chatMessages.length === 0 && !chatLoading)) return;
+    const frame = requestAnimationFrame(() => {
+      const panel = coachPanelRef.current;
+      panel?.scrollTo({ top: panel.scrollHeight, behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [chatMessages, chatLoading, copilotTab]);
 
   async function act(pass: boolean, cards: string[] = selected) {
     if (!game) return; setLoading(true); setError("");
@@ -111,7 +120,7 @@ export function CoachLab() {
         {error && <p className="error">{error}</p>}
         <aside className="copilot" aria-label="AI Copilot">
           <div className="copilotTabs"><button className={copilotTab === "coach" ? "active" : ""} onClick={() => setCopilotTab("coach")}>AI Coach</button><button className={copilotTab === "history" ? "active" : ""} onClick={() => setCopilotTab("history")}>History <small>{game?.history.length ?? 0}</small></button></div>
-          {copilotTab === "coach" ? <div className="coachPanel">
+          {copilotTab === "coach" ? <div className="coachPanel" ref={coachPanelRef}>
             {coachLoading && !aiAdvice && <div className="coachThinking"><i/><span>Enumerating legal moves, comparing policy values, and reading the table…</span></div>}
             {aiAdvice ? <div className="coachAnalysis"><section className="moveFeed">{aiAdvice.moveAnalyses.map((item)=><article key={item.index}><span>#{item.index} · {seatLabels[item.seat]}</span><strong>{item.summary}</strong><p>{item.impact}</p></article>)}</section><span className="analysisLabel">{aiAdvice.confidence > 0 ? `${Math.round(aiAdvice.confidence * 100)}% CONFIDENCE` : "UNCALIBRATED POLICY PICK"}</span><h3>{aiAdvice.cardIds.length===0?"Pass this turn":`Play ${coachCards.map(cardText).join(" ")}`}</h3><div className="recommendedCards">{coachCards.map((card)=><MiniCard card={card} key={card.id}/>)}</div><section><p>{aiAdvice.rationale}</p></section>{aiAdvice.alternatives.length > 0 && <section><ul>{aiAdvice.alternatives.map((item)=><li key={item}>{item}</li>)}</ul></section>}{aiAdvice.assumptions.length > 0 && <section><ul>{aiAdvice.assumptions.map((item)=><li key={item}>{item}</li>)}</ul></section>}<div className="coachButtons">{aiAdvice.cardIds.length===0?<button className="primary" onClick={()=>void act(true)}>Follow: Pass</button>:<><button className="secondary" onClick={()=>setSelected(aiAdvice.cardIds)}>Highlight Cards</button><button className="primary" onClick={()=>void act(false,aiAdvice.cardIds)}>Play This Move</button></>}</div><small className="modelNote">Powered by DanZero</small></div> : !coachLoading && <div className="coachEmpty"><button className="secondary" onClick={()=>void askAICoach()}>Analyze this turn</button></div>}
             <div className="chatThread">{chatMessages.map((item, index)=><div className={`chatMessage ${item.role}`} key={index}>{item.content}</div>)}{chatLoading && <div className="chatMessage assistant">Thinking…</div>}</div>
