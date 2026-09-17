@@ -22,11 +22,13 @@ const MODE_SIZES := {
 }
 
 const RARITY_GLINT_INTENSITY := {
-	"Standard": 0.28,
-	"Limited": 0.36,
-	"Special": 0.46,
-	"Elite": 0.58,
+	"Standard": 0.22,
+	"Limited": 0.28,
+	"Special": 0.36,
+	"Elite": 0.46,
 }
+
+const _LAYOUT := CardPrintSpecScript.LAYOUT
 
 const RARITY_PIP_COLORS := {
 	"Standard": Color("8a9098"),
@@ -89,6 +91,7 @@ func bind(data: Dictionary, display_mode: String) -> void:
 	size = custom_minimum_size
 	pivot_offset = size * 0.5
 	_ensure_frame_polish()
+	_apply_frame_inset()
 	_apply_mode_layout()
 
 	var hidden := mode == "hidden" or bool(data.get("hidden", false))
@@ -160,11 +163,11 @@ func _apply_glint_state(state: String, palette: Dictionary) -> void:
 	var base := float(RARITY_GLINT_INTENSITY.get(rarity, 0.28))
 	match state:
 		"legal":
-			base *= 1.35
+			base *= 1.18
 		"selected":
-			base *= 1.55
+			base *= 1.28
 		"unavailable":
-			base *= 0.25
+			base *= 0.22
 	material.set_shader_parameter("intensity", base)
 	var tint: Color = palette["border"] as Color
 	material.set_shader_parameter("tint_color", tint.lerp(Color("eef2f8"), 0.35))
@@ -220,6 +223,10 @@ func _notification(what: int) -> void:
 	elif what == NOTIFICATION_MOUSE_EXIT:
 		_set_hover_lift(false)
 		inspected.emit({})
+	elif what == NOTIFICATION_RESIZED:
+		if is_inside_tree() and size.x > 0.0 and size.y > 0.0:
+			_apply_frame_inset()
+			_apply_mode_layout()
 	elif what == NOTIFICATION_PREDELETE and _hover_tween != null and _hover_tween.is_valid():
 		_hover_tween.kill()
 
@@ -295,7 +302,9 @@ func _apply_mode_layout() -> void:
 	var artwork_vignette := get_node("Frame/ArtworkVignette") as Control
 	var artwork_sheen := get_node("Frame/ArtworkSheen") as Control
 	var rarity_pip := get_node("Frame/RarityPip") as Control
-	frame.clip_contents = false
+	var content := _frame_content_size()
+	var inset := _frame_inset()
+	frame.clip_contents = mode != "catalog"
 	artwork.visible = mode != "hidden"
 	title.visible = mode != "hidden"
 	type.visible = mode in ["catalog", "hand"]
@@ -312,15 +321,15 @@ func _apply_mode_layout() -> void:
 		category_glow.visible = mode != "hidden"
 	get_node("Frame/Costs/Deployment").visible = mode != "battlefield"
 	get_node("Frame/Costs/Operation").visible = mode != "battlefield"
-	var pip := 20.0 if mode == "battlefield" else 22.0
-	var pip_font := 11 if mode == "battlefield" else 13 if mode == "catalog" else 12
+	var pip := maxf(16.0, content.y * (20.0 / 244.0))
+	var pip_font := _scaled_font(11 if mode == "battlefield" else 13 if mode == "catalog" else 12, 244.0)
 	_style_pip(get_node("Frame/Costs/Deployment"), pip, pip_font)
 	_style_pip(get_node("Frame/Costs/Operation"), pip, pip_font)
 	_style_pip(get_node("Frame/Stats/Attack"), pip, pip_font)
 	_style_pip(get_node("Frame/Stats/Defense"), pip, pip_font)
-	costs.add_theme_constant_override("separation", 2)
-	stats.add_theme_constant_override("separation", 2)
-	stats.alignment = BoxContainer.ALIGNMENT_END
+	costs.add_theme_constant_override("separation", maxi(1, int(round(content.x * 0.012))))
+	stats.add_theme_constant_override("separation", maxi(1, int(round(content.x * 0.012))))
+	stats.alignment = BoxContainer.ALIGNMENT_END if mode != "battlefield" else BoxContainer.ALIGNMENT_BEGIN
 	var gap := get_node_or_null("Frame/Stats/Gap") as Control
 	if gap != null:
 		gap.visible = mode == "battlefield"
@@ -328,97 +337,92 @@ func _apply_mode_layout() -> void:
 
 	match mode:
 		"catalog":
-			title.add_theme_font_size_override("font_size", 13)
-			type.add_theme_font_size_override("font_size", 11)
+			title.add_theme_font_size_override("font_size", _scaled_font(13, 244.0))
+			type.add_theme_font_size_override("font_size", _scaled_font(11, 244.0))
 			type.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			_set_rect(title, 5, 3, 116, 27)
-			_set_rect(type, 118, 3, 167, 27)
-			_set_rect(title_banner, 2, 1, 170, 29)
-			_set_rect(artwork, 5, 30, 167, 128)
-			_set_rect(artwork_vignette, 5, 30, 167, 128)
-			_set_rect(artwork_sheen, 5, 30, 167, 128)
-			_set_rect(artwork_trim, 5, 30, 167, 128)
-			_set_rect(costs, 5, 31, 53, 55)
-			_set_rect(stats, 119, 31, 167, 55)
-			_set_rect(description, 6, 132, 166, 190)
-			_set_rect(keywords, 6, 194, 166, 220)
-			_set_rect(category_strip, 0, 0, 4, 244)
+			_layout_card_region(title, inset, 9.0, 7.0, 120.0, 31.0)
+			_layout_card_region(type, inset, 122.0, 7.0, 171.0, 31.0)
+			_layout_card_region(title_banner, inset, 6.0, 5.0, 174.0, 33.0)
+			_layout_art_stack(artwork, artwork_vignette, artwork_sheen, artwork_trim, inset, 9.0, 34.0, 171.0, 132.0)
+			_layout_card_region(costs, inset, 9.0, 35.0, 57.0, 59.0)
+			_layout_card_region(stats, inset, 123.0, 35.0, 171.0, 59.0)
+			_layout_card_region(description, inset, 10.0, 136.0, 170.0, 194.0)
+			_layout_card_region(keywords, inset, 10.0, 198.0, 170.0, 224.0)
+			_layout_card_region(category_strip, inset, 0.0, 0.0, 4.0, 248.0)
 			if category_glow != null:
-				_set_rect(category_glow, 4, 1, 7, 243)
-			_set_rect(rarity_pip, 156, 3, 168, 9)
-		"hand":
-			_set_rect(artwork, 3, 2, 105, 150)
-			_set_rect(artwork_vignette, 3, 2, 105, 150)
-			_set_rect(artwork_sheen, 3, 2, 105, 150)
-			_set_rect(artwork_trim, 3, 2, 105, 150)
-			_set_rect(costs, 2, 2, 50, 26)
-			_set_rect(stats, 58, 2, 106, 26)
-			type.add_theme_font_size_override("font_size", 8)
+				_layout_card_region(category_glow, inset, 4.0, 5.0, 7.0, 247.0)
+			_layout_card_region(rarity_pip, inset, 160.0, 7.0, 172.0, 13.0)
+		"hand", "hidden":
+			type.add_theme_font_size_override("font_size", _scaled_font(8, 154.0))
 			type.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			_set_rect(title, 4, 27, 66, 43)
-			_set_rect(title_banner, 3, 26, 105, 44)
-			_set_rect(type, 66, 27, 104, 43)
-			_set_rect(keywords, 56, 16, 104, 28)
-			_set_rect(category_strip, 0, 0, 4, 154)
+			_layout_art_stack(artwork, artwork_vignette, artwork_sheen, artwork_trim, inset, 6.0, 5.0, 108.0, 153.0)
+			_layout_card_region(costs, inset, 5.0, 5.0, 53.0, 29.0)
+			_layout_card_region(stats, inset, 61.0, 5.0, 109.0, 29.0)
+			_layout_card_region(title, inset, 7.0, 30.0, 69.0, 46.0)
+			_layout_card_region(title_banner, inset, 6.0, 29.0, 108.0, 47.0)
+			_layout_card_region(type, inset, 69.0, 30.0, 107.0, 46.0)
+			_layout_card_region(category_strip, inset, 0.0, 0.0, 4.0, 158.0)
 			if category_glow != null:
-				_set_rect(category_glow, 4, 1, 7, 153)
+				_layout_card_region(category_glow, inset, 4.0, 4.0, 7.0, 157.0)
 		"battlefield":
-			type.add_theme_font_size_override("font_size", 8)
+			type.add_theme_font_size_override("font_size", _scaled_font(8, 96.0))
 			stats.alignment = BoxContainer.ALIGNMENT_BEGIN
-			_set_rect(artwork, 2, 2, 70, 102)
-			_set_rect(artwork_vignette, 2, 2, 70, 102)
-			_set_rect(artwork_sheen, 2, 2, 70, 102)
-			_set_rect(artwork_trim, 2, 2, 70, 102)
-			_set_rect(stats, 2, 2, 70, 24)
-			_set_rect(title, 3, 25, 69, 40)
-			_set_rect(title_banner, 2, 24, 70, 41)
-			_set_rect(type, 3, 88, 69, 102)
-			_set_rect(costs, 3, 81, 23, 104)
-			_set_rect(category_strip, 0, 0, 4, 104)
+			_layout_art_stack(artwork, artwork_vignette, artwork_sheen, artwork_trim, inset, 4.0, 4.0, 72.0, 104.0)
+			_layout_card_region(stats, inset, 4.0, 4.0, 72.0, 26.0)
+			_layout_card_region(title, inset, 5.0, 27.0, 71.0, 42.0)
+			_layout_card_region(title_banner, inset, 4.0, 26.0, 72.0, 43.0)
+			_layout_card_region(type, inset, 5.0, 90.0, 71.0, 104.0)
+			_layout_card_region(category_strip, inset, 0.0, 0.0, 4.0, 106.0)
 			if category_glow != null:
-				_set_rect(category_glow, 4, 1, 7, 103)
+				_layout_card_region(category_glow, inset, 4.0, 3.0, 7.0, 105.0)
 	costs.clip_contents = false
 	stats.clip_contents = false
+	var vignette := get_node("Frame/ArtworkVignette") as ColorRect
+	var vig_material := vignette.material as ShaderMaterial
+	if vig_material != null:
+		vig_material.set_shader_parameter("strength", 0.48 if mode == "catalog" else 0.40)
 	_style_nameplate(title, title_banner, type, description, keywords)
+	_sync_overlay_stretch()
 
 
 func _style_nameplate(title: Label, banner: Control, type: Label, description: Control, keywords: Control) -> void:
 	var plate := StyleBoxFlat.new()
-	plate.bg_color = Color(0.05, 0.05, 0.04, 0.78 if mode == "catalog" else 0.62)
-	plate.border_color = Color(0.55, 0.46, 0.28, 0.55)
+	plate.bg_color = Color(0.04, 0.042, 0.046, 0.72 if mode == "catalog" else 0.54)
+	plate.border_color = Color(0.62, 0.66, 0.72, 0.28)
 	plate.border_width_bottom = 1
 	plate.set_corner_radius_all(2)
 	plate.anti_aliasing = true
 	if banner is Panel:
 		(banner as Panel).add_theme_stylebox_override("panel", plate)
-	title.add_theme_color_override("font_color", Color(0.86, 0.88, 0.92, 0.98))
-	title.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.025, 0.75))
-	title.add_theme_constant_override("outline_size", 2)
-	title.add_theme_color_override("font_shadow_color", Color(0.01, 0.01, 0.015, 0.85))
+	title.add_theme_color_override("font_color", Color(0.88, 0.90, 0.94, 0.98))
+	title.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.025, 0.72))
+	title.add_theme_constant_override("outline_size", 2 if mode == "catalog" else 1)
+	title.add_theme_color_override("font_shadow_color", Color(0.01, 0.01, 0.015, 0.78))
 	title.add_theme_constant_override("shadow_offset_x", 0)
-	title.add_theme_constant_override("shadow_offset_y", 2)
-	type.add_theme_color_override("font_color", Color(0.62, 0.66, 0.72, 0.92))
-	type.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.025, 0.70))
+	title.add_theme_constant_override("shadow_offset_y", 1)
+	type.add_theme_color_override("font_color", Color(0.66, 0.70, 0.76, 0.92))
+	type.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.025, 0.68))
 	type.add_theme_constant_override("outline_size", 1)
 	if description is Label:
 		var body := description as Label
-		body.add_theme_color_override("font_color", Color(0.58, 0.62, 0.68, 0.94))
-		body.add_theme_font_size_override("font_size", 11)
+		body.add_theme_color_override("font_color", Color(0.62, 0.66, 0.72, 0.94))
+		body.add_theme_font_size_override("font_size", _scaled_font(11, 244.0))
 		if mode == "catalog":
 			body.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 	if keywords is Label:
-		(keywords as Label).add_theme_color_override("font_color", Color(0.52, 0.56, 0.62, 0.90))
+		(keywords as Label).add_theme_color_override("font_color", Color(0.56, 0.60, 0.66, 0.90))
+		(keywords as Label).add_theme_font_size_override("font_size", _scaled_font(9, 244.0))
 
 
 func _fit_title(value: String) -> void:
 	var title := get_node("Frame/Title") as Label
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_WORD
-	var font_size := 13
+	var font_size := _scaled_font(13, 244.0)
 	if mode == "hand":
-		font_size = 9 if value.length() <= 16 else 8
+		font_size = _scaled_font(9 if value.length() <= 16 else 8, 154.0)
 	elif mode == "battlefield":
-		font_size = 10
+		font_size = _scaled_font(10, 96.0)
 	title.add_theme_font_size_override("font_size", font_size)
 
 
@@ -469,8 +473,8 @@ func _ensure_frame_polish() -> void:
 	var inner := get_node("Frame/FrameInner") as Panel
 	var metal := ShaderMaterial.new()
 	metal.shader = METAL_SHADER
-	metal.set_shader_parameter("grain", 0.042)
-	metal.set_shader_parameter("brush", 0.032)
+	metal.set_shader_parameter("grain", 0.028)
+	metal.set_shader_parameter("brush", 0.022)
 	inner.material = metal
 	var frame_overlay := get_node("FrameOverlay") as TextureRect
 	if frame_overlay.texture == null and ResourceLoader.exists(CardPrintSpecScript.FRAME_TEXTURE):
@@ -480,11 +484,11 @@ func _ensure_frame_polish() -> void:
 		foil.texture = load(CardPrintSpecScript.FOIL_MASK_TEXTURE)
 	var sheen := get_node("Frame/ArtworkSheen") as TextureRect
 	sheen.texture = _artwork_sheen_texture()
-	sheen.modulate = Color(1, 1, 1, 0.55)
+	sheen.modulate = Color(1, 1, 1, 0.42)
 	var vignette := get_node("Frame/ArtworkVignette") as ColorRect
 	var material := ShaderMaterial.new()
 	material.shader = ART_VIGNETTE_SHADER
-	material.set_shader_parameter("strength", 0.52)
+	material.set_shader_parameter("strength", 0.48)
 	vignette.material = material
 
 
@@ -506,13 +510,13 @@ func _apply_inner_frame(palette: Dictionary) -> void:
 	var inner := StyleBoxFlat.new()
 	var fill: Color = palette["fill"]
 	inner.bg_color = fill
-	inner.bg_color.a = 0.98
-	inner.border_color = (palette["border"] as Color).darkened(0.55)
-	inner.border_color.a = 0.35
+	inner.bg_color.a = 0.72
+	inner.border_color = (palette["border"] as Color).darkened(0.62)
+	inner.border_color.a = 0.22
 	inner.set_border_width_all(1)
-	inner.set_corner_radius_all(4)
-	inner.shadow_color = Color(0.01, 0.01, 0.005, 0.28)
-	inner.shadow_size = 2
+	inner.set_corner_radius_all(maxf(2.0, round(_frame_inset())))
+	inner.shadow_color = Color(0.01, 0.01, 0.005, 0.18)
+	inner.shadow_size = 1
 	inner.shadow_offset = Vector2(0, 1)
 	inner.anti_aliasing = true
 	get_node("Frame/FrameInner").add_theme_stylebox_override("panel", inner)
@@ -575,6 +579,66 @@ func _style_pip(label: Label, size: float, font_size: int) -> void:
 	label.add_theme_color_override("font_shadow_color", Color(0.01, 0.01, 0.015, 0.90))
 	label.add_theme_constant_override("shadow_offset_x", 0)
 	label.add_theme_constant_override("shadow_offset_y", 2)
+
+
+func _frame_inset() -> float:
+	return maxf(2.0, round(size.x * float(_LAYOUT["frame_inset"])))
+
+
+func _frame_content_size() -> Vector2:
+	var inset := _frame_inset()
+	return size - Vector2(inset * 2.0, inset * 2.0)
+
+
+func _apply_frame_inset() -> void:
+	var inset := _frame_inset()
+	var frame := get_node("Frame") as Control
+	frame.offset_left = inset
+	frame.offset_top = inset
+	frame.offset_right = -inset
+	frame.offset_bottom = -inset
+	var inner := get_node("Frame/FrameInner") as Panel
+	var inner_pad := maxf(1.0, round(inset * 0.5))
+	inner.offset_left = inner_pad
+	inner.offset_top = inner_pad
+	inner.offset_right = -inner_pad
+	inner.offset_bottom = -inner_pad
+
+
+func _layout_card_region(control: Control, inset: float, left: float, top: float, right: float, bottom: float) -> void:
+	var ref: Vector2 = MODE_SIZES[mode]
+	var sx: float = size.x / ref.x
+	var sy: float = size.y / ref.y
+	_set_rect(control, left * sx - inset, top * sy - inset, right * sx - inset, bottom * sy - inset)
+
+
+func _layout_art_stack(
+	artwork: Control,
+	vignette: Control,
+	sheen: Control,
+	trim: Control,
+	inset: float,
+	left: float,
+	top: float,
+	right: float,
+	bottom: float,
+) -> void:
+	for node in [artwork, vignette, sheen, trim]:
+		_layout_card_region(node, inset, left, top, right, bottom)
+
+
+func _scaled_font(base: int, ref_height: float) -> int:
+	return maxi(8, int(round(float(base) * _frame_content_size().y / ref_height)))
+
+
+func _sync_overlay_stretch() -> void:
+	for path in ["FrameOverlay", "FoilOverlay"]:
+		var overlay := get_node(path) as TextureRect
+		overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+		overlay.offset_left = 0.0
+		overlay.offset_top = 0.0
+		overlay.offset_right = 0.0
+		overlay.offset_bottom = 0.0
 
 
 func _set_rect(control: Control, left: float, top: float, right: float, bottom: float) -> void:
