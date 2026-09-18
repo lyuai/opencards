@@ -20,7 +20,8 @@ load_dotenv(PROJECT_ROOT / ".env", override=False)
 def create_app(testing: bool = False) -> Flask:
     app = Flask(__name__)
     app.config["TESTING"] = testing
-    CORS(app, origins=[os.getenv("WEB_ORIGIN", "http://localhost:3000")])
+    origins = [item.strip() for item in os.getenv("WEB_ORIGIN", "http://localhost:3000").split(",") if item.strip()]
+    CORS(app, origins=origins)
     data_dir = Path(os.getenv("OPENCARDS_DATA_DIR", Path(__file__).parents[1] / "data"))
     games = GameStore()
     jobs = JobStore(data_dir / "jobs.json")
@@ -48,8 +49,8 @@ def create_app(testing: bool = False) -> Flask:
         except (TypeError, ValueError) as exc:
             return error(str(exc), 422)
         except Exception as exc:  # model load failures must be visible
-            app.logger.exception("create DanZero deal")
-            return error(f"could not start DanZero game: {exc}", 500)
+            app.logger.exception("create deal")
+            return error(f"无法开局: {exc}", 500)
 
     @app.post("/v1/games/guandan/deals/<game_id>/actions")
     def play(game_id):
@@ -84,8 +85,8 @@ def create_app(testing: bool = False) -> Flask:
         except ValueError as exc:
             return error(str(exc), 409)
         except Exception as exc:
-            app.logger.exception("DanZero coach")
-            return error(f"DanZero policy unavailable: {exc}", 502)
+            app.logger.exception("coach")
+            return error(f"教练暂时不可用: {exc}", 502)
 
     @app.post("/v1/games/guandan/deals/<game_id>/copilot/messages")
     def copilot_message(game_id):
@@ -103,8 +104,8 @@ def create_app(testing: bool = False) -> Flask:
         except RuntimeError as exc:
             return error(str(exc), 503)
         except Exception as exc:
-            app.logger.exception("Arena Copilot")
-            return error(f"Arena Copilot unavailable: {exc}", 502)
+            app.logger.exception("coach chat")
+            return error("教练暂时答不上来", 502)
 
     @app.post("/v1/imports")
     def create_import():

@@ -6,8 +6,8 @@ import os
 from openai import OpenAI
 
 
-SYSTEM_PROMPT = """You are Arena Copilot, an expert Guandan coach.
-Answer the player's question using the supplied live game state. Explain strategic tradeoffs clearly and distinguish facts, inferences, and uncertainty. Never invent hidden cards, model scores, or legal moves. When comparing an alternative play, verify it against legal context when available. Be concise but specific."""
+SYSTEM_PROMPT = """你是 OpenCards 的掼蛋教练。
+根据当前公开牌面回答玩家的问题。讲清楚利弊，区分事实、推断和不确定之处。不要编造别人手里的牌、模型分数或非法出牌。对比另一种打法时，先对照合法出牌。用简体中文，具体但别啰嗦。"""
 
 
 def ask_copilot(game_state: dict, recommendation: dict, message: str, conversation: list[dict], reasoning_effort: str = "medium", coaching_style: str = "detailed") -> dict:
@@ -15,7 +15,7 @@ def ask_copilot(game_state: dict, recommendation: dict, message: str, conversati
     model = os.getenv("AI_MODEL") or os.getenv("OPENAI_MODEL")
     base_url = os.getenv("AI_BASE_URL") or os.getenv("OPENAI_BASE_URL")
     if not api_key or not model:
-        raise RuntimeError("Arena Copilot model is not configured")
+        raise RuntimeError("教练还没配置，暂时只能给出出牌建议")
 
     client = OpenAI(api_key=api_key, base_url=base_url or None)
     context = {

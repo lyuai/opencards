@@ -2,6 +2,8 @@
 .env
 .env.local
 .next/
+.react-router/
+apps/web/build/
 node_modules/
 .pnpm-store/
 *.tsbuildinfo

@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+projects:
+  - name: opencards
+    environments:
+      - name: production
+        services:
+          - type: web
+            name: opencards-api
+            runtime: python
+            repo: https://github.com/lyuai/opencards
+            region: singapore
+            plan: standard
+            branch: main
+            autoDeployTrigger: commit
+            healthCheckPath: /healthz
+            buildCommand: git submodule update --init --recursive && pip install -r services/api/requirements.txt
+            startCommand: PYTHONPATH=services/api:third_party/rlcard-guandan gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 "opencards_api.app:create_app()"
+            envVars:
+              - key: PYTHON_VERSION
+                value: "3.12.8"
+              - key: WEB_ORIGIN
+                value: https://opencards-web.onrender.com
+              - key: AI_PROVIDER
+                value: OpenRouter
+              - key: AI_BASE_URL
+                value: https://openrouter.ai/api/v1
+              - key: AI_MODEL
+                value: google/gemini-3.8-flash
+              - key: AI_API_KEY
+                sync: false
+
+          - type: web
+            name: opencards-web
+            runtime: static
+            repo: https://github.com/lyuai/opencards
+            branch: main
+            autoDeployTrigger: commit
+            buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @opencards/web build
+            staticPublishPath: apps/web/build/client
+            routes:
+              - type: rewrite
+                source: /*
+                destination: /index.html
+            headers:
+              - path: /*
+                name: X-Frame-Options
+                value: DENY
+              - path: /assets/*
+                name: Cache-Control
+                value: public, max-age=31536000, immutable
+            envVars:
+              - key: NODE_VERSION
+                value: "22"
+              - key: SKIP_INSTALL_DEPS
+                value: "true"
+              - key: VITE_API_URL
+                value: https://opencards-api.onrender.com

@@ -1,12 +1,16 @@
-"use client";
-
-import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { Brand } from "./brand";
+import { apiUrl } from "./config";
 
 type Card = { id: string; rank: string; suit: string };
 type Combo = { type: string; size: number; power: number };
 type Action = { index: number; seat: string; kind: "play" | "pass"; cards?: Card[]; combination?: Combo };
+type LegalAction = { index: number; kind: "play" | "pass"; codes?: string[]; cards?: Card[]; combination?: Combo };
+type LastDeal = {
+  number: number; finished: string[]; winnerTeam: "you" | "opponent"; yourTeamWon: boolean;
+  kind: string; levelGain: number; yourLevel: string; opponentLevel: string; matchOver: boolean;
+};
 type AIAdvice = { provider: string; recommendation: string; cardIds: string[]; combination?: Combo; rationale: string; alternatives: string[]; assumptions: string[]; confidence: number; moveAnalyses: { index: number; seat: string; summary: string; impact: string }[] };
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type Game = {
@@ -14,17 +18,35 @@ type Game = {
   counts: Record<"south" | "west" | "north" | "east", number>;
   turn: "south" | "west" | "north" | "east"; currentPlay?: Action;
   history: Action[]; finished: string[]; gameOver: boolean; createdAt: string;
+  waitingForHuman: boolean; legalActions: LegalAction[]; dealNumber: number;
+  playTeam: "you" | "opponent"; yourLevel: string; opponentLevel: string;
+  winnerTeam: "you" | "opponent" | null; lastDeal: LastDeal | null;
   settings: { seed: number | null; opponentPolicy: string };
 };
 
 const seats = [
-  { id: "north", label: "Partner", role: "AI Teammate", className: "north" }, { id: "west", label: "West", role: "AI Opponent", className: "west" },
-  { id: "east", label: "East", role: "AI Opponent", className: "east" }, { id: "south", label: "You", role: "Human", className: "south" },
+  { id: "north", label: "对家", role: "队友", className: "north" },
+  { id: "west", label: "上家", role: "对方", className: "west" },
+  { id: "east", label: "下家", role: "对方", className: "east" },
+  { id: "south", label: "你", role: "人类", className: "south" },
 ] as const;
-const seatLabels: Record<string, string> = { south: "You", west: "West", north: "Partner", east: "East" };
+const seatLabels: Record<string, string> = { south: "你", west: "上家", north: "对家", east: "下家" };
+const finishLabels = ["头游", "二游", "三游", "末游"];
+const kindLabels: Record<string, string> = { double_up: "双上", first_third: "头游三游", first_fourth: "头游末游" };
+
+function cardCode(card: Card) { return card.id.split(":")[1]; }
+function sortedCodes(codes: string[]) { return [...codes].sort().join(","); }
+function comboLabel(value?: string) {
+  const labels: Record<string, string> = {
+    single: "单张", pair: "对子", triple: "三张", full_house: "三带二", straight: "顺子",
+    consecutive_pairs: "三连对", consecutive_triples: "钢板", straight_flush: "同花顺",
+    rank_bomb: "炸弹", joker_bomb: "四王",
+  };
+  return labels[value ?? ""] ?? "出牌";
+}
 
 export function CoachLab() {
-  const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+  const api = apiUrl;
   const [game, setGame] = useState<Game | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -34,8 +56,10 @@ export function CoachLab() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dealSeed, setDealSeed] = useState("");
+  const [opponentPolicy, setOpponentPolicy] = useState("base7");
   const [autoCoach, setAutoCoach] = useState(true);
   const [confirmPlay, setConfirmPlay] = useState(false);
   const [compactCards, setCompactCards] = useState(false);
@@ -44,17 +68,41 @@ export function CoachLab() {
   const [error, setError] = useState("");
   const [seatPlays, setSeatPlays] = useState<Partial<Record<Game["turn"], Action>>>({});
   const [aiThinkingSeat, setAIThinkingSeat] = useState<Game["turn"] | null>(null);
+  const [dealNotice, setDealNotice] = useState<LastDeal | null>(null);
   const coachPanelRef = useRef<HTMLDivElement>(null);
+  const hintIndex = useRef(0);
+  const dragMode = useRef<"select" | "deselect" | null>(null);
+  const dragged = useRef(new Set<string>());
 
   const dealCards = useCallback(async () => {
-    setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]); setSeatPlays({});
+    setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]); setSeatPlays({}); setDealNotice(null);
     try {
-      const response = await fetch(`${api}/v1/games/guandan/deals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ opponentPolicy: "danzero", seed: dealSeed === "" ? null : Number(dealSeed) }) });
-      const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Could not deal cards"); setGame(body); void requestCoach(body);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not deal cards"); }
-    finally { setLoading(false); }
-  }, [api, autoCoach, dealSeed]);
-  useEffect(() => { void dealCards(); }, []); // Deal once; the current settings apply to later actions and deals.
+      const response = await fetch(`${api}/v1/games/guandan/deals`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opponentPolicy, seed: dealSeed === "" ? null : Number(dealSeed) }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "无法开局");
+      setGame(body);
+      hintIndex.current = 0;
+      void requestCoach(body);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "无法开局");
+    } finally {
+      setLoading(false);
+    }
+  }, [api, autoCoach, dealSeed, opponentPolicy]);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("opencards.opponent");
+    if (stored === "base7" || stored === "danzero" || stored === "random") setOpponentPolicy(stored);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("opencards.opponent", opponentPolicy);
+  }, [opponentPolicy]);
+
   useEffect(() => {
     if (copilotTab !== "coach" || (chatMessages.length === 0 && !chatLoading)) return;
     const frame = requestAnimationFrame(() => {
@@ -63,58 +111,105 @@ export function CoachLab() {
     });
     return () => cancelAnimationFrame(frame);
   }, [chatMessages, chatLoading, copilotTab]);
+
   useEffect(() => {
-    if (!game || game.gameOver || game.turn === "south") {
+    if (!game || game.gameOver || game.waitingForHuman) {
       setAIThinkingSeat(null);
       return;
     }
     let cancelled = false;
-    const actingSeat = game.turn;
+    const actingSeat = game.turn === "south" ? null : game.turn;
     setAIThinkingSeat(actingSeat);
+    const delay = game.settings.opponentPolicy === "danzero" ? 850 : 420;
     const timer = window.setTimeout(async () => {
       try {
         const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/ai-actions`, { method: "POST" });
         const body = await response.json();
-        if (!response.ok) throw new Error(body.error ?? "AI action failed");
+        if (!response.ok) throw new Error(body.error ?? "AI 出牌失败");
         if (cancelled) return;
         placeLatestAction(game, body);
         setGame(body);
-        if (body.turn === "south") void requestCoach(body);
+        if (body.waitingForHuman) void requestCoach(body);
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : "AI action failed");
+        if (!cancelled) setError(caught instanceof Error ? caught.message : "AI 出牌失败");
       } finally {
         if (!cancelled) setAIThinkingSeat(null);
       }
-    }, 850);
+    }, delay);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [api, game?.id, game?.history.length, game?.turn]);
+  }, [api, game?.id, game?.history.length, game?.turn, game?.waitingForHuman, game?.dealNumber, game?.gameOver]);
+
+  useEffect(() => {
+    if (!autoCoach || !game?.waitingForHuman || game.gameOver) return;
+    void requestCoach(game);
+  }, [autoCoach, game?.id, game?.waitingForHuman, game?.history.length, game?.dealNumber]);
 
   function placeLatestAction(previous: Game, next: Game) {
+    if (next.lastDeal && next.lastDeal.number !== (previous.lastDeal?.number ?? -1)) {
+      setDealNotice(next.lastDeal);
+      setSeatPlays({});
+      setSelected([]);
+      setAIAdvice(null);
+      hintIndex.current = 0;
+    }
+    if (next.dealNumber !== previous.dealNumber) {
+      setSeatPlays({});
+      const action = next.history.at(-1);
+      if (action) setSeatPlays({ [action.seat]: action });
+      return;
+    }
     const action = next.history.at(-1);
     if (!action) return;
     setSeatPlays((current) => ({ ...(previous.currentPlay ? current : {}), [action.seat]: action }));
   }
 
   async function act(pass: boolean, cards: string[] = selected) {
-    if (!game) return; setLoading(true); setError("");
-    if (confirmPlay && !window.confirm(pass ? "Pass this turn?" : `Play ${cards.length} selected card${cards.length === 1 ? "" : "s"}?`)) { setLoading(false); return; }
+    if (!game) return;
+    setLoading(true); setError("");
+    if (confirmPlay && !window.confirm(pass ? "确定不出？" : `打出 ${cards.length} 张牌？`)) {
+      setLoading(false);
+      return;
+    }
     try {
-      const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardIds: pass ? [] : cards, pass }) });
+      const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardIds: pass ? [] : cards, pass }),
+      });
       const body = await response.json();
-      if (response.status === 404 && body.error === "game not found") { await dealCards(); setError("The previous game expired after a server restart, so a new hand was dealt."); return; }
-      if (!response.ok) throw new Error(body.error ?? "Illegal action"); placeLatestAction(game, body); setGame(body); setSelected([]); setAIAdvice(null); void requestCoach(body);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Illegal action"); }
-    finally { setLoading(false); }
+      if (response.status === 404 && body.error === "game not found") {
+        await dealCards();
+        setError("上一局因服务重启失效，已重新开局。");
+        return;
+      }
+      if (!response.ok) throw new Error(body.error ?? "出牌不合法");
+      placeLatestAction(game, body);
+      setGame(body);
+      setSelected([]);
+      setAIAdvice(null);
+      hintIndex.current = 0;
+      void requestCoach(body);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "出牌不合法");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function requestCoach(nextGame: Game, force = false) {
-    if (nextGame.turn !== "south" || nextGame.gameOver || (!autoCoach && !force)) return;
+    if (!nextGame.waitingForHuman || nextGame.gameOver || (!autoCoach && !force)) return;
     setCoachLoading(true);
     try {
-      const response=await fetch(`${api}/v1/games/guandan/deals/${nextGame.id}/coach`,{method:"POST"});
-      const body=await response.json(); if(!response.ok) throw new Error(body.error??"AI coach unavailable"); setAIAdvice(body);
-    } catch(caught){setError(caught instanceof Error?caught.message:"AI coach unavailable");}
-    finally{setCoachLoading(false);}
+      const response = await fetch(`${api}/v1/games/guandan/deals/${nextGame.id}/coach`, { method: "POST" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "教练暂不可用");
+      setAIAdvice(body);
+      setSelected((current) => current.length > 0 ? current : body.cardIds ?? []);
+    } catch (caught) {
+      if (force || autoCoach) setError(caught instanceof Error ? caught.message : "教练暂不可用");
+    } finally {
+      setCoachLoading(false);
+    }
   }
 
   async function askAICoach() { if (game) await requestCoach(game, true); }
@@ -125,53 +220,285 @@ export function CoachLab() {
     const nextMessages: ChatMessage[] = [...chatMessages, { role: "user", content: clean }];
     setChatMessages(nextMessages); setChatDraft(""); setChatLoading(true);
     try {
-      const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/copilot/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: clean, conversation: chatMessages, reasoningEffort, coachingStyle }) });
+      const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/copilot/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: clean, conversation: chatMessages, reasoningEffort, coachingStyle }),
+      });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Copilot unavailable");
+      if (!response.ok) throw new Error(body.error ?? "教练暂时答不上来");
       setChatMessages([...nextMessages, { role: "assistant", content: body.content }]);
     } catch (caught) {
-      setChatMessages([...nextMessages, { role: "assistant", content: caught instanceof Error ? caught.message : "Copilot unavailable" }]);
-    } finally { setChatLoading(false); }
+      setChatMessages([...nextMessages, { role: "assistant", content: caught instanceof Error ? caught.message : "教练暂时答不上来" }]);
+    } finally {
+      setChatLoading(false);
+    }
   }
 
-  const yourTurn = game?.turn === "south" && !game.gameOver;
+  const legalActions = game?.legalActions ?? [];
+  const canPass = legalActions.some((action) => action.kind === "pass");
+  const playActions = legalActions.filter((action): action is LegalAction & { codes: string[] } => action.kind === "play" && Boolean(action.codes));
+  const matchedAction = useMemo(() => {
+    if (!game || selected.length === 0) return null;
+    const selectedKey = sortedCodes(selected.map((id) => game.yourHand.find((card) => card.id === id)).filter((card): card is Card => Boolean(card)).map(cardCode));
+    return playActions.find((action) => sortedCodes(action.codes) === selectedKey) ?? null;
+  }, [game, playActions, selected]);
+
+  function applyCard(id: string, mode: "select" | "deselect") {
+    setSelected((current) => {
+      if (mode === "select") return current.includes(id) ? current : [...current, id];
+      return current.filter((item) => item !== id);
+    });
+  }
+
+  function cardIdAtPoint(x: number, y: number) {
+    const node = document.elementFromPoint(x, y)?.closest("[data-card-id]");
+    return node instanceof HTMLElement ? node.dataset.cardId ?? null : null;
+  }
+
+  function startDrag(event: React.PointerEvent<HTMLDivElement>) {
+    if (!game?.waitingForHuman) return;
+    const id = cardIdAtPoint(event.clientX, event.clientY);
+    if (!id) return;
+    event.preventDefault();
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* ignore */ }
+    const mode = selected.includes(id) ? "deselect" : "select";
+    dragMode.current = mode;
+    dragged.current = new Set([id]);
+    applyCard(id, mode);
+  }
+
+  function moveDrag(event: React.PointerEvent<HTMLDivElement>) {
+    if (!dragMode.current) return;
+    const id = cardIdAtPoint(event.clientX, event.clientY);
+    if (!id || dragged.current.has(id)) return;
+    dragged.current.add(id);
+    applyCard(id, dragMode.current);
+  }
+
+  function endDrag() {
+    dragMode.current = null;
+    dragged.current = new Set();
+  }
+
+  function cycleHint() {
+    if (!game || playActions.length === 0) return;
+    const action = playActions[hintIndex.current % playActions.length];
+    hintIndex.current += 1;
+    const remaining = [...action.codes];
+    const ids: string[] = [];
+    for (const card of game.yourHand) {
+      const code = cardCode(card);
+      const index = remaining.indexOf(code);
+      if (index >= 0) {
+        ids.push(card.id);
+        remaining.splice(index, 1);
+      }
+    }
+    setSelected(ids);
+  }
+
+  const yourTurn = Boolean(game?.waitingForHuman && !game.gameOver);
   const coachCards = aiAdvice?.cardIds.map((id) => game?.yourHand.find((card) => card.id === id)).filter((card): card is Card => Boolean(card)) ?? [];
   const handGroups = game?.yourHand.reduce<Card[][]>((groups, card) => {
     const current = groups.at(-1);
     if (current?.[0]?.rank === card.rank) current.push(card); else groups.push([card]);
     return groups;
   }, []) ?? [];
-  return <main>
-    <header><nav><Link className="active" href="/">Arena</Link><Link href="/training">Training</Link></nav><button className="settingsToggle" aria-label="Game settings" aria-expanded={settingsOpen} onClick={()=>setSettingsOpen((open)=>!open)}>⚙</button></header>
+  const selectedIllegal = yourTurn && selected.length > 0 && !matchedAction;
+  const statusText = game?.gameOver
+    ? (game.winnerTeam === "you" ? "你们过级获胜" : "对家过级获胜")
+    : yourTurn
+      ? "轮到你出牌"
+      : `${seatLabels[game?.turn ?? ""] ?? "AI"} ${aiThinkingSeat ? "思考中" : "出牌中"}`;
+
+  return <main className="arena">
     <div className="playWorkspace">
-      <section className={`gameArea ${compactCards ? "compactCards" : ""}`} aria-label="Guandan card table">
-        <div className="dealBar"><b>{game?.gameOver ? "Game over" : yourTurn ? "Your turn" : `${seatLabels[game?.turn ?? ""] ?? "AI"} ${aiThinkingSeat ? "is thinking" : "to play"}`}</b><button className="secondary" type="button" disabled={loading || Boolean(aiThinkingSeat)} onClick={dealCards}>New Deal</button></div>
+      <section className={`gameArea ${compactCards ? "compactCards" : ""}`} aria-label="掼蛋牌桌">
+        <header>
+          <Brand />
+          <div className="dealBar">
+            <b>{game ? statusText : "准备开局"}</b>
+            <span>{game ? `第 ${game.dealNumber} 副 · 打 ${game.levelRank} · 我方 ${game.yourLevel} / 对方 ${game.opponentLevel}` : "你坐南家，对家是队友"}</span>
+          </div>
+          <div className="headerActions">
+            <button className="settingsToggle" aria-label="怎么打" aria-expanded={helpOpen} onClick={() => { setHelpOpen((open) => !open); setSettingsOpen(false); }}>?</button>
+            <button className="settingsToggle" aria-label="对局设置" aria-expanded={settingsOpen} onClick={() => { setSettingsOpen((open) => !open); setHelpOpen(false); }}>⚙</button>
+            {game && <button className="secondary" type="button" disabled={loading || Boolean(aiThinkingSeat)} onClick={() => void dealCards()}>重新开局</button>}
+          </div>
+        </header>
         <div className="table">
-          {seats.map((seat) => <Player key={seat.id} className={seat.className} label={seat.label} role={seat.role} count={game?.counts[seat.id] ?? 0} active={game?.turn === seat.id} thinking={aiThinkingSeat === seat.id} action={seatPlays[seat.id]}/>) }
-          <SeatPlay action={seatPlays.south} className="southPlay" />
-          <div className="tableCenter"><b>{game?.currentPlay ? comboLabel(game.currentPlay.combination?.type) : "Lead any legal play"}</b><span>{game?.currentPlay ? `${seatLabels[game.currentPlay.seat]} controls the trick` : "Fresh trick"}</span></div>
-          <div className="tableHand"><div className="tableActions"><button className="secondary" disabled={!yourTurn || loading || !game?.currentPlay} onClick={() => void act(true)}>Pass</button><button className="primary" disabled={!yourTurn || loading || selected.length === 0} onClick={() => void act(false)}>{loading ? "Playing…" : "Play Selected"}</button></div><div className="hand" aria-label="Your hand">{handGroups.map((cards) => <div className="cardStack" key={cards[0].rank}>{cards.map((card) => <CardButton card={card} wild={card.rank === game?.levelRank && card.suit === "♥"} recommended={aiAdvice?.cardIds.includes(card.id) ?? false} selected={selected.includes(card.id)} key={card.id} onClick={() => yourTurn && setSelected((current) => current.includes(card.id) ? current.filter((id) => id !== card.id) : [...current, card.id])}/>)}</div>)}</div></div>
+          {seats.map((seat) => (
+            <Player
+              key={seat.id}
+              className={seat.className}
+              label={seat.label}
+              role={seat.role}
+              count={game?.counts[seat.id] ?? 0}
+              active={game?.turn === seat.id}
+              thinking={aiThinkingSeat === seat.id}
+              action={seatPlays[seat.id]}
+              finish={game?.finished.indexOf(seat.id) ?? -1}
+            />
+          ))}
+          <SeatPlay action={yourTurn ? undefined : seatPlays.south} className="southPlay" />
+          <div className="tableCenter">
+            <b>{game?.currentPlay ? comboLabel(game.currentPlay.combination?.type) : "任意合法牌型领出"}</b>
+            <span>{game?.currentPlay ? `${seatLabels[game.currentPlay.seat]} 控牌` : "新一轮"}</span>
+          </div>
+          <div className="tableHand">
+            <div className="tableActions">
+              <button className="secondary" disabled={!yourTurn || loading || playActions.length === 0} onClick={cycleHint}>提示</button>
+              <button className="secondary" disabled={!yourTurn || loading || !canPass} onClick={() => void act(true)}>不出</button>
+              <button className="primary" disabled={!yourTurn || loading || !matchedAction} onClick={() => void act(false)}>{loading ? "出牌中…" : "出牌"}</button>
+            </div>
+            {game && game.counts.south === 0 && !game.gameOver ? <p className="handEmpty">你已经出完，等待本副结束</p> : (
+              <div className="hand" aria-label="你的手牌" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
+                {handGroups.map((cards) => (
+                  <div className="cardStack" key={cards[0].rank}>
+                    {cards.map((card) => (
+                      <CardButton
+                        card={card}
+                        wild={card.rank === game?.levelRank && card.suit === "♥"}
+                        recommended={aiAdvice?.cardIds.includes(card.id) ?? false}
+                        selected={selected.includes(card.id)}
+                        key={card.id}
+                        disabled={!yourTurn}
+                        onToggle={() => applyCard(card.id, selected.includes(card.id) ? "deselect" : "select")}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+            {selectedIllegal && <p className="playHint">选中的牌不是当前合法牌型，点「提示」可轮换可出组合</p>}
+          </div>
         </div>
-        {error && <p className="error">{error}</p>}
-        <aside className="copilot" aria-label="AI Copilot">
-          <div className="copilotTabs"><button className={copilotTab === "coach" ? "active" : ""} onClick={() => setCopilotTab("coach")}>AI Coach</button><button className={copilotTab === "history" ? "active" : ""} onClick={() => setCopilotTab("history")}>History <small>{game?.history.length ?? 0}</small></button></div>
-          {copilotTab === "coach" ? <div className="coachPanel" ref={coachPanelRef}>
-            {coachLoading && !aiAdvice && <div className="coachThinking"><i/><span>Enumerating legal moves, comparing policy values, and reading the table…</span></div>}
-            {aiAdvice ? <div className="coachAnalysis"><section className="moveFeed">{aiAdvice.moveAnalyses.map((item)=><article key={item.index}><span>#{item.index} · {seatLabels[item.seat]}</span><strong>{item.summary}</strong><p>{item.impact}</p></article>)}</section><span className="analysisLabel">{aiAdvice.confidence > 0 ? `${Math.round(aiAdvice.confidence * 100)}% CONFIDENCE` : "UNCALIBRATED POLICY PICK"}</span><h3>{aiAdvice.cardIds.length===0?"Pass this turn":`Play ${coachCards.map(cardText).join(" ")}`}</h3><div className="recommendedCards">{coachCards.map((card)=><MiniCard card={card} key={card.id}/>)}</div><section><p>{aiAdvice.rationale}</p></section>{aiAdvice.alternatives.length > 0 && <section><ul>{aiAdvice.alternatives.map((item)=><li key={item}>{item}</li>)}</ul></section>}{aiAdvice.assumptions.length > 0 && <section><ul>{aiAdvice.assumptions.map((item)=><li key={item}>{item}</li>)}</ul></section>}<small className="modelNote">Powered by DanZero</small></div> : !coachLoading && <div className="coachEmpty"><button className="secondary" onClick={()=>void askAICoach()}>Analyze this turn</button></div>}
-            <div className="chatThread">{chatMessages.map((item, index)=><div className={`chatMessage ${item.role}`} key={index}>{item.role === "assistant" ? <ReactMarkdown>{item.content}</ReactMarkdown> : item.content}</div>)}{chatLoading && <div className="chatMessage assistant">Thinking…</div>}</div>
-            {aiAdvice && <div className="coachQuickActions">{aiAdvice.cardIds.length===0?<button className="primary" onClick={()=>void act(true)}>Follow: Pass</button>:<><button className="secondary" onClick={()=>setSelected(aiAdvice.cardIds)}>Highlight</button><button className="primary" onClick={()=>void act(false,aiAdvice.cardIds)}>Play This Move</button></>}</div>}
-            <form className="copilotComposer" onSubmit={(event)=>{event.preventDefault(); void sendCopilotMessage();}}><textarea aria-label="Ask Arena Copilot" rows={2} value={chatDraft} onChange={(event)=>setChatDraft(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();void sendCopilotMessage();}}} placeholder="Ask about this position…"/><button type="submit" aria-label="Send message" disabled={!chatDraft.trim()||chatLoading}>↑</button></form>
-          </div> : <section className="history" aria-label="Complete play history"><div className="actionLog">{game?.history.map((action) => <div className="logRow" key={action.index}><span>#{action.index}</span><b>{seatLabels[action.seat]}</b>{action.kind === "pass" ? <i>Pass</i> : <><em>{comboLabel(action.combination?.type)}</em><div className="playedCards">{action.cards?.map((card) => <MiniCard card={card} key={card.id}/>)}</div></>}</div>)}</div></section>}
-        </aside>
-        {settingsOpen && <section className="gameSettings" aria-label="Game settings"><label>Coach reasoning<select value={reasoningEffort} onChange={(event)=>setReasoningEffort(event.target.value)}><option value="low">Fast</option><option value="medium">Balanced</option><option value="high">Deep</option></select></label><label>Coaching style<select value={coachingStyle} onChange={(event)=>setCoachingStyle(event.target.value)}><option value="direct">Direct</option><option value="detailed">Detailed</option><option value="socratic">Socratic</option></select></label><label>Replay seed<input inputMode="numeric" value={dealSeed} onChange={(event)=>setDealSeed(event.target.value.replace(/\D/g,""))} placeholder="Random"/></label><label><input type="checkbox" checked={autoCoach} onChange={(event)=>{setAutoCoach(event.target.checked);if(!event.target.checked)setAIAdvice(null);}}/>Automatic coaching</label><label><input type="checkbox" checked={confirmPlay} onChange={(event)=>setConfirmPlay(event.target.checked)}/>Confirm before playing</label><label><input type="checkbox" checked={compactCards} onChange={(event)=>setCompactCards(event.target.checked)}/>Compact hand</label><button className="primary" onClick={()=>setSettingsOpen(false)}>Done</button></section>}
+        {dealNotice && !game?.gameOver && (
+          <div className="tableOverlay" role="status">
+            <div>
+              <small>第 {dealNotice.number} 副结束</small>
+              <h2>{dealNotice.yourTeamWon ? "我方升过这副" : "对方升过这副"}</h2>
+              <p>{kindLabels[dealNotice.kind] ?? "本副结束"}，升 {dealNotice.levelGain} 级。进贡已自动完成。</p>
+              <p>完成顺序：{dealNotice.finished.map((seat, index) => `${finishLabels[index]} ${seatLabels[seat]}`).join(" · ")}</p>
+              <button className="primary" type="button" onClick={() => setDealNotice(null)}>继续下一副</button>
+            </div>
+          </div>
+        )}
+        {game?.gameOver && (
+          <div className="tableOverlay" role="dialog">
+            <div>
+              <small>整局结束</small>
+              <h2>{game.winnerTeam === "you" ? "你们打过 A，获胜" : "对方打过 A，本局失利"}</h2>
+              <p>我方 {game.yourLevel} · 对方 {game.opponentLevel}</p>
+              {game.lastDeal && <p>末副顺序：{game.lastDeal.finished.map((seat, index) => `${finishLabels[index]} ${seatLabels[seat]}`).join(" · ")}</p>}
+              <button className="primary" type="button" onClick={() => void dealCards()}>再来一局</button>
+            </div>
+          </div>
+        )}
+        {error && <p className="error" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label="关闭">×</button></p>}
+        {!game && (
+          <div className="lobby" role="dialog" aria-labelledby="lobby-title">
+            <div className="lobbyCard">
+              <i className="brandMark lg" aria-hidden="true" />
+              <small>OPENCARDS</small>
+              <h1 id="lobby-title">坐下，打一局掼蛋</h1>
+              <p>你坐南家，对家是队友。教练看着公开牌面给建议，出不出由你定。</p>
+              <label>对手
+                <select value={opponentPolicy} onChange={(event) => setOpponentPolicy(event.target.value)}>
+                  <option value="base7">规则 AI</option>
+                  <option value="danzero">强力 AI</option>
+                  <option value="random">随机</option>
+                </select>
+              </label>
+              <button className="primary" type="button" disabled={loading} onClick={() => void dealCards()}>{loading ? "正在发牌…" : "开始对局"}</button>
+              <button className="textLink" type="button" onClick={() => setHelpOpen(true)}>先看怎么打</button>
+            </div>
+          </div>
+        )}
+        {helpOpen && (
+          <div className="helpSheet" role="dialog" aria-labelledby="help-title">
+            <div>
+              <small>怎么打</small>
+              <h2 id="help-title">选牌、跟牌、听教练</h2>
+              <ol>
+                <li>点选或滑动选牌，合法组合才会点亮「出牌」。</li>
+                <li>跟牌必须压过当前牌型，否则点「不出」。</li>
+                <li>「提示」轮换当前能出的牌；右侧建议可以一键打出。</li>
+                <li>打过 A 的一方获胜，进贡会自动处理。</li>
+              </ol>
+              <button className="primary" type="button" onClick={() => setHelpOpen(false)}>知道了</button>
+            </div>
+          </div>
+        )}
+        {settingsOpen && <section className="gameSettings" aria-label="对局设置">
+          <label>对手<select value={opponentPolicy} onChange={(event) => setOpponentPolicy(event.target.value)}><option value="base7">规则 AI</option><option value="danzero">强力 AI</option><option value="random">随机</option></select></label>
+          <label>教练讲解<select value={coachingStyle} onChange={(event) => setCoachingStyle(event.target.value)}><option value="direct">直接</option><option value="detailed">详细</option><option value="socratic">追问</option></select></label>
+          <label><input type="checkbox" checked={autoCoach} onChange={(event) => { setAutoCoach(event.target.checked); if (!event.target.checked) setAIAdvice(null); }} />每手自动给建议</label>
+          <label><input type="checkbox" checked={confirmPlay} onChange={(event) => setConfirmPlay(event.target.checked)} />出牌前确认</label>
+          <label><input type="checkbox" checked={compactCards} onChange={(event) => setCompactCards(event.target.checked)} />紧凑手牌</label>
+          <details>
+            <summary>高级</summary>
+            <label>讲解深度<select value={reasoningEffort} onChange={(event) => setReasoningEffort(event.target.value)}><option value="low">快</option><option value="medium">均衡</option><option value="high">深入</option></select></label>
+            <label>重放种子<input inputMode="numeric" value={dealSeed} onChange={(event) => setDealSeed(event.target.value.replace(/\D/g, ""))} placeholder="随机" /></label>
+          </details>
+          <button className="primary" onClick={() => { setSettingsOpen(false); void dealCards(); }}>{game ? "按此设置重开" : "按此设置开局"}</button>
+        </section>}
       </section>
+      <aside className="copilot" aria-label="教练">
+        <div className="copilotTabs">
+          <button className={copilotTab === "coach" ? "active" : ""} onClick={() => setCopilotTab("coach")}>教练</button>
+          <button className={copilotTab === "history" ? "active" : ""} onClick={() => setCopilotTab("history")}>记录 <small>{game?.history.length ?? 0}</small></button>
+        </div>
+        {copilotTab === "coach" ? <>
+          <div className="coachPanel" ref={coachPanelRef}>
+            {coachLoading && !aiAdvice && <div className="coachThinking"><i /><span>正在看这一手怎么打…</span></div>}
+            {aiAdvice ? <div className="coachAnalysis">
+              <small>这一手</small>
+              <h3>{aiAdvice.cardIds.length === 0 ? "建议不出" : `建议出 ${coachCards.map(cardText).join(" ")}`}</h3>
+              <div className="recommendedCards">{coachCards.map((card) => <MiniCard card={card} key={card.id} />)}</div>
+              <p>{aiAdvice.rationale}</p>
+              {aiAdvice.alternatives.length > 0 && <ul>{aiAdvice.alternatives.map((item) => <li key={item}>{item}</li>)}</ul>}
+            </div> : !coachLoading && <div className="coachEmpty">{game ? (autoCoach ? "轮到你时会自动给出建议。" : <button className="secondary" onClick={() => void askAICoach()}>看这一手怎么打</button>) : "开局之后，这里会告诉你这一手更稳妥的打法。"}</div>}
+            <div className="chatThread">{chatMessages.map((item, index) => <div className={`chatMessage ${item.role}`} key={index}>{item.role === "assistant" ? <ReactMarkdown>{item.content}</ReactMarkdown> : item.content}</div>)}{chatLoading && <div className="chatMessage assistant">正在想…</div>}</div>
+          </div>
+          {aiAdvice && <div className="coachQuickActions">{aiAdvice.cardIds.length === 0 ? <button className="primary" onClick={() => void act(true)}>按建议不出</button> : <><button className="secondary" onClick={() => setSelected(aiAdvice.cardIds)}>高亮</button><button className="primary" onClick={() => void act(false, aiAdvice.cardIds)}>打出建议</button></>}</div>}
+          <form className="copilotComposer" onSubmit={(event) => { event.preventDefault(); void sendCopilotMessage(); }}>
+            <textarea aria-label="问教练" rows={2} value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendCopilotMessage(); } }} placeholder="问这一手怎么打…" />
+            <button type="submit" aria-label="发送" disabled={!chatDraft.trim() || chatLoading}>↑</button>
+          </form>
+        </> : <section className="history" aria-label="出牌记录">
+          <div className="actionLog">{game?.history.map((action) => <div className="logRow" key={action.index}><span>#{action.index}</span><b>{seatLabels[action.seat]}</b>{action.kind === "pass" ? <i>不出</i> : <><em>{comboLabel(action.combination?.type)}</em><div className="playedCards">{action.cards?.map((card) => <MiniCard card={card} key={card.id} />)}</div></>}</div>)}</div>
+        </section>}
+      </aside>
     </div>
   </main>;
 }
 
-function Player({ className, label, role, count, active, thinking, action }: { className: string; label: string; role: string; count: number; active: boolean; thinking: boolean; action?: Action }) { return <div className={`player ${className} ${active ? "activePlayer" : ""}`}><b>{label}</b><span>{count} cards</span><em>{thinking ? "Thinking…" : active ? "Playing" : role}</em><SeatPlay action={action}/></div>; }
-function SeatPlay({ action, className = "" }: { action?: Action; className?: string }) { if (!action) return null; return <div className={`seatPlay ${className}`} key={action.index}>{action.kind === "pass" ? <i>Pass</i> : action.cards?.map((card)=><MiniCard card={card} key={card.id}/>)}</div>; }
-function CardButton({ card, wild, recommended, selected, onClick }: { card: Card; wild: boolean; recommended: boolean; selected: boolean; onClick: () => void }) { const red=card.suit==="♥"||card.suit==="♦", joker=card.suit==="★", goldJoker=joker&&card.rank==="RJ"; return <button type="button" aria-pressed={selected} aria-label={`${card.rank} ${card.suit}${wild ? " wild card" : ""}`} className={`playingCard ${red?"red":""} ${joker?"joker":""} ${goldJoker?"goldJoker":""} ${wild?"wild":""} ${recommended?"recommended":""}`} onClick={onClick}><span>{joker?"JOKER":card.rank}</span><i>{joker?(goldJoker?"★":"☆"):card.suit}</i>{wild?<small>WILD</small>:joker&&<small>{goldJoker?"GOLD":"SILVER"}</small>}</button>; }
-function MiniCard({ card }: { card: Card }) { const jokerTone=card.rank==="RJ"?"gold":card.rank==="BJ"?"silver":""; return <span className={jokerTone||((card.suit==="♥"||card.suit==="♦")?"red":"")}>{card.suit==="★"?`${card.rank}★`:`${card.rank}${card.suit}`}</span>; }
-function cardText(card: Card) { return `${card.rank}${card.suit}`; }
-function comboLabel(value?: string) { const labels: Record<string,string>={single:"Single",pair:"Pair",triple:"Triple",full_house:"Full House",straight:"Straight",consecutive_pairs:"Consecutive Pairs",consecutive_triples:"Plate",straight_flush:"Straight Flush",rank_bomb:"Bomb",joker_bomb:"Joker Bomb"}; return labels[value ?? ""] ?? "Play"; }
+function Player({ className, label, role, count, active, thinking, action, finish }: { className: string; label: string; role: string; count: number; active: boolean; thinking: boolean; action?: Action; finish: number }) {
+  return <div className={`player ${className} ${active ? "activePlayer" : ""}`}>
+    <b>{label}</b>
+    <span>{count} 张</span>
+    <em>{finish >= 0 ? finishLabels[finish] : thinking ? "思考中…" : active ? "出牌" : role}</em>
+    <SeatPlay action={action} />
+  </div>;
+}
+function SeatPlay({ action, className = "" }: { action?: Action; className?: string }) {
+  if (!action) return null;
+  return <div className={`seatPlay ${className}`} key={action.index}>{action.kind === "pass" ? <i>不出</i> : action.cards?.map((card) => <MiniCard card={card} key={card.id} />)}</div>;
+}
+function CardButton({ card, wild, recommended, selected, disabled, onToggle }: { card: Card; wild: boolean; recommended: boolean; selected: boolean; disabled: boolean; onToggle: () => void }) {
+  const red = card.suit === "♥" || card.suit === "♦", joker = card.suit === "★", goldJoker = joker && card.rank === "RJ";
+  return <button type="button" data-card-id={card.id} disabled={disabled} aria-pressed={selected} aria-label={`${card.rank} ${card.suit}${wild ? " 逢人配" : ""}`} className={`playingCard ${red ? "red" : ""} ${joker ? "joker" : ""} ${goldJoker ? "goldJoker" : ""} ${wild ? "wild" : ""} ${recommended ? "recommended" : ""}`} onKeyDown={(event) => {
+    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onToggle(); }
+  }}>
+    <span>{joker ? (goldJoker ? "大" : "小") : card.rank}</span>
+    <i>{joker ? (goldJoker ? "★" : "☆") : card.suit}</i>
+    {wild ? <small>逢人配</small> : joker && <small>王</small>}
+  </button>;
+}
+function MiniCard({ card }: { card: Card }) {
+  if (card.suit === "★") return <span className={card.rank === "RJ" ? "gold" : "silver"}>{card.rank === "RJ" ? "大王" : "小王"}</span>;
+  return <span className={(card.suit === "♥" || card.suit === "♦") ? "red" : ""}>{`${card.rank}${card.suit}`}</span>;
+}
+function cardText(card: Card) { return card.suit === "★" ? (card.rank === "RJ" ? "大王" : "小王") : `${card.rank}${card.suit}`; }

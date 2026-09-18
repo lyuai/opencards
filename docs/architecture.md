@@ -12,13 +12,13 @@
 4. **Coaching** — candidate actions from the kernel, search/simulation or learned
    policy ranking, retrieval of relevant strategy, and an LLM explanation constrained
    to verified state and citations.
-5. **Experience** — Next.js replay lab now; Unity hall/rooms later. Both consume the
-   same API, realtime event stream, asset IDs, and replay schema.
+5. **Experience** — React Router 掼蛋牌桌与教练现在；Unity 大厅以后。两边用同一套
+   API、事件流、资源 ID 和回放协议。
 
 ## System shape
 
 ```text
-Next.js / future Unity
+React Router / future Unity
         |
  Python API: auth, library, sessions, feedback, jobs
         |

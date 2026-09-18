@@ -2,11 +2,10 @@ from opencards_api.app import create_app
 
 
 def advance_to_human(client, deal):
-    while deal["turn"] != "south" and not deal["gameOver"]:
+    while not deal.get("waitingForHuman") and not deal["gameOver"]:
         response = client.post(f'/v1/games/guandan/deals/{deal["id"]}/ai-actions')
         assert response.status_code == 200
         next_deal = response.get_json()
-        assert len(next_deal["history"]) == len(deal["history"]) + 1
         deal = next_deal
     return deal
 
@@ -27,7 +26,9 @@ def test_deal_coach_and_play_contract(tmp_path, monkeypatch):
     assert deal_response.status_code == 201
     deal = advance_to_human(client, deal_response.get_json())
     assert len(deal["yourHand"]) == 27
+    assert deal["waitingForHuman"] is True
     assert deal["turn"] == "south"
+    assert deal["legalActions"]
 
     coach_response = client.post(f'/v1/games/guandan/deals/{deal["id"]}/coach')
     assert coach_response.status_code == 200
@@ -75,3 +76,10 @@ def test_deal_accepts_reproducible_settings(tmp_path, monkeypatch):
     second = client.post("/v1/games/guandan/deals", json={"seed": 42, "opponentPolicy": "danzero"}).get_json()
     assert first["settings"] == {"seed": 42, "opponentPolicy": "danzero"}
     assert [card["rank"] + card["suit"] for card in first["yourHand"]] == [card["rank"] + card["suit"] for card in second["yourHand"]]
+
+
+def test_deal_rejects_unknown_opponent_policy(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENCARDS_DATA_DIR", str(tmp_path))
+    client = create_app(testing=True).test_client()
+    response = client.post("/v1/games/guandan/deals", json={"opponentPolicy": "perfectdan"})
+    assert response.status_code == 422

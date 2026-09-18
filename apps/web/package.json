@@ -2,22 +2,26 @@
   "name": "@opencards/web",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "dev": "react-router dev --port 3000",
+    "build": "react-router build",
+    "start": "vite preview --port 3000",
+    "typecheck": "react-router typegen && tsc --noEmit"
   },
   "dependencies": {
-    "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "react-router": "^8.4.0",
+    "isbot": "^5"
   },
   "devDependencies": {
+    "@react-router/dev": "^8.4.0",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vite": "^8"
   }
 }

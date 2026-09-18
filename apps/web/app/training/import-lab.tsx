@@ -1,12 +1,11 @@
-"use client";
-
-import Link from "next/link";
+import { NavLink } from "react-router";
 import { FormEvent, useEffect, useState } from "react";
+import { apiUrl } from "../config";
 
 type ImportJob = { id: string; status: string; stage: string; progress: number; message?: string; result?: { extractionStatus?: string; message?: string; observations?: unknown[]; stableCandidates?: unknown[]; metrics?: { changedFrames?: number; stableFrames?: number; paidModelCalls?: number }; validation?: { status?: string; message?: string; potentialJumpCuts?: number } } };
 
 export function ImportLab() {
-  const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+  const api = apiUrl;
   const [url, setURL] = useState("https://www.bilibili.com/video/BV1Cztq6EE5G/");
   const [job, setJob] = useState<ImportJob | null>(null);
   const [error, setError] = useState("");
@@ -30,15 +29,15 @@ export function ImportLab() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not create import"); }
   }
 
-  return <main>
-    <header><b>OpenCards</b><nav><Link href="/">Play</Link><Link className="active" href="/training">Training</Link></nav><span>Training workspace</span></header>
-    <section className="trainingIntro"><small>REPLAY INGESTION</small><h1>Build training material</h1><p>Submit game footage, follow local extraction, and review evidence before a replay enters the coaching library.</p></section>
-    <section className="importPanel" aria-label="Video import">
-      <form onSubmit={submit}><div><b>Import game video</b><span>The local worker will claim this task.</span></div><input aria-label="Bilibili video URL" value={url} onChange={(event) => setURL(event.target.value)} type="url" required/><button type="submit">Create task</button></form>
+  return <main className="training">
+    <header><b>OpenCards</b><nav><NavLink className={({ isActive }) => isActive ? "active" : ""} to="/">Arena</NavLink><NavLink className={({ isActive }) => isActive ? "active" : ""} to="/training">训练</NavLink></nav><span>训练台</span></header>
+    <section className="trainingIntro"><small>录像接入</small><h1>整理训练素材</h1><p>提交对局录像，走本地抽取，确认证据后再进入教练库。</p></section>
+    <section className="importPanel" aria-label="视频导入">
+      <form onSubmit={submit}><div><b>导入对局视频</b><span>本地 worker 会领取这个任务。</span></div><input aria-label="Bilibili 视频链接" value={url} onChange={(event) => setURL(event.target.value)} type="url" required/><button type="submit">创建任务</button></form>
       {job && <div className="jobStatus"><span className={`statusDot ${job.status}`}/><b>{job.stage.replaceAll("_", " ")}</b><progress value={job.progress} max="1"/><span>{job.message || `Waiting for a local worker · ${job.id}`}</span>{job.result?.extractionStatus && <em>{job.result.extractionStatus.replaceAll("_", " ")}</em>}</div>}
       {job?.result && <div className="captureSummary"><b>{job.result.stableCandidates?.length ?? 0} stable candidates from {job.result.observations?.length ?? 0} table changes</b><span>{job.result.validation?.message ?? job.result.message}</span><span>{job.result.validation?.potentialJumpCuts ?? 0} possible jump cuts · {job.result.metrics?.paidModelCalls ?? 0} paid AI calls</span></div>}
-      {error && <p className="error">{error}. Is the Python API running?</p>}
+      {error && <p className="error">{error}。API 是否在跑？</p>}
     </section>
-    <section className="captureSteps"><b>Ingestion order</b><ol><li>Reuse the local media cache when available.</li><li>Otherwise download publicly accessible media directly.</li><li>Use the authenticated browser capture only as fallback.</li></ol><p>Media stays local. Only stable table changes continue to card recognition.</p></section>
+    <section className="captureSteps"><b>接入顺序</b><ol><li>能复用本地媒体缓存就先复用。</li><li>否则直接下载公开可访问的媒体。</li><li>只有前两步不行时，才用登录后的浏览器抓取。</li></ol><p>媒体留在本地。只有稳定的桌面变化才会进入识牌。</p></section>
   </main>;
 }
