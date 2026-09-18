@@ -301,6 +301,10 @@ class PolicyGame:
             legal = self._match_action(action, state.get("actions", []))
             if legal is None:
                 raise RuntimeError("建议动作不在当前合法出牌里")
+            refined = self._refine_coach_action(state, legal)
+            if refined is not None:
+                legal = refined
+                self._advice_cache_action = refined
             passed = legal[0] == "PASS"
             cards = [] if passed else _cards(legal[2], "hand")
             hand = self._view()["yourHand"]
@@ -315,13 +319,42 @@ class PolicyGame:
             return {
                 "provider": "policy:danzero", "recommendation": label,
                 "cardIds": ids, "combination": _combo(legal),
-                "rationale": "根据当前公开牌面和全部合法出牌，这一手更稳妥。对手和对家的手牌都看不到，只作参考。",
+                "rationale": self._coach_rationale(state, legal, action),
                 "alternatives": [],
                 "assumptions": ["对手和对家的手牌未知"],
                 "confidence": 0,
                 "moveAnalyses": _move_analyses(self._view()["history"]),
                 "policy": {"name": "DanZero", "action": legal, "legalActionCount": len(state.get("actions", []))},
             }
+
+    @staticmethod
+    def _refine_coach_action(state, intended):
+        actions = state.get("actions") or []
+        pass_action = next((item for item in actions if item and item[0] == "PASS"), None)
+        if pass_action is None or not intended or intended[0] == "PASS":
+            return intended
+        if int(state.get("greaterPos", -1) or -1) != 2:
+            return intended
+        cards = list(intended[2] or [])
+        hand = list(state.get("current_hand") or [])
+        if cards and len(cards) == len(hand):
+            return intended
+        left = list(state.get("num_cards_left") or [27, 27, 27, 27])
+        while len(left) < 4:
+            left.append(27)
+        if intended[0] in {"StraightFlush", "Bomb", "FourKings"} and min(int(left[1]), int(left[3])) <= 2:
+            return intended
+        return pass_action
+
+    @staticmethod
+    def _coach_rationale(state, legal, raw):
+        if legal and legal[0] == "PASS" and raw and raw[0] != "PASS" and int(state.get("greaterPos", -1) or -1) == 2:
+            names = {"StraightFlush": "同花顺", "Bomb": "炸弹", "FourKings": "四王"}
+            kept = names.get(raw[0], "大牌")
+            return f"对家在控牌，不必压。{kept}留下来对付上家下家，或者自己收牌。"
+        if legal and legal[0] == "PASS":
+            return "这一手不必争控牌，先不出更稳。"
+        return "根据当前公开牌面和全部合法出牌，这一手更稳妥。对手和对家的手牌都看不到，只作参考。"
 
     def _get_advisor(self):
         if self._advisor is None:

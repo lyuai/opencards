@@ -21,6 +21,34 @@ def _play_legal(game, action):
     return game.act(ids, False)
 
 
+def test_coach_passes_instead_of_covering_partner_with_a_straight_flush():
+    flush = ["StraightFlush", "8", ["C4", "C5", "C6", "C7", "C8"]]
+    stay = ["PASS", "PASS", "PASS"]
+    state = {
+        "actions": [flush, stay],
+        "current_hand": ["C4", "C5", "C6", "C7", "C8", "S2", "H3", "D9"],
+        "num_cards_left": [20, 17, 12, 22],
+        "greaterAction": ["ThreeWithTwo", "3", ["S3", "H3", "D3", "S2", "H2"]],
+        "greaterPos": 2,
+    }
+    refined = PolicyGame._refine_coach_action(state, flush)
+    assert refined[0] == "PASS"
+    assert "对家在控牌" in PolicyGame._coach_rationale(state, refined, flush)
+
+
+def test_coach_still_covers_partner_when_that_empties_the_hand():
+    flush = ["StraightFlush", "8", ["C4", "C5", "C6", "C7", "C8"]]
+    stay = ["PASS", "PASS", "PASS"]
+    state = {
+        "actions": [flush, stay],
+        "current_hand": ["C4", "C5", "C6", "C7", "C8"],
+        "num_cards_left": [5, 17, 12, 22],
+        "greaterAction": ["ThreeWithTwo", "3", ["S3", "H3", "D3", "S2", "H2"]],
+        "greaterPos": 2,
+    }
+    assert PolicyGame._refine_coach_action(state, flush) == flush
+
+
 def test_danzero_advice_is_an_engine_legal_action():
     game = PolicyGame(seed=42)
     before = _advance_to_human(game)
