@@ -51,6 +51,6 @@ docs/                 架构与路线图
 
 ## 发布
 
-`render.yaml` 在 LYU.ai workspace 里起两个服务：静态站点 `opencards-web`，以及跑牌局的 `opencards-api`。网页构建时写入 `VITE_API_URL`；API 用 `WEB_ORIGIN` 放行站点来源。教练追问还需要在 Dashboard 填 `AI_API_KEY`。
+`render.yaml` 在 LYU.ai workspace 里起两个服务：静态站点 `opencards-web`（`https://dan.lyu.ai`），以及跑牌局的 `opencards-api`（`https://danapi.lyu.ai`）。网页构建时写入 `VITE_API_URL`；API 用 `WEB_ORIGIN` 放行站点来源。教练追问还需要在 Dashboard 填 `AI_API_KEY`。
 
 见 [docs/architecture.md](docs/architecture.md)。

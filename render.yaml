@@ -13,13 +13,15 @@ projects:
             branch: main
             autoDeployTrigger: commit
             healthCheckPath: /healthz
-            buildCommand: git submodule update --init --recursive && pip install -r services/api/requirements.txt
+            domains:
+              - danapi.lyu.ai
+            buildCommand: git submodule update --init --recursive && pip install -e ./third_party/rlcard-guandan -r services/api/requirements.txt
             startCommand: PYTHONPATH=services/api:third_party/rlcard-guandan gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 "opencards_api.app:create_app()"
             envVars:
               - key: PYTHON_VERSION
                 value: "3.12.8"
               - key: WEB_ORIGIN
-                value: https://opencards-web.onrender.com
+                value: https://dan.lyu.ai,https://opencards-web.onrender.com
               - key: AI_PROVIDER
                 value: OpenRouter
               - key: AI_BASE_URL
@@ -35,6 +37,8 @@ projects:
             repo: https://github.com/lyuai/opencards
             branch: main
             autoDeployTrigger: commit
+            domains:
+              - dan.lyu.ai
             buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @opencards/web build
             staticPublishPath: apps/web/build/client
             routes:
@@ -54,4 +58,4 @@ projects:
               - key: SKIP_INSTALL_DEPS
                 value: "true"
               - key: VITE_API_URL
-                value: https://opencards-api.onrender.com
+                value: https://danapi.lyu.ai
