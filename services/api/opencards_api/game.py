@@ -15,6 +15,7 @@ from guandan_rlcard.game.card_utils import cards2str
 SEATS = {0: "south", 1: "east", 2: "north", 3: "west"}
 SUITS = {"S": "♠", "H": "♥", "C": "♣", "D": "♦"}
 RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
+FINISH_LABELS = ("头游", "二游", "三游", "末游")
 PLAYABLE_POLICIES = ("danzero", "base7", "random")
 COMBOS = {
     "Single": "single", "Pair": "pair", "Trips": "triple",
@@ -81,6 +82,110 @@ def _level_gain(kind: str) -> int:
     return {"double_up": 3, "first_third": 2, "first_fourth": 1}.get(kind, 1)
 
 
+def _card_text(card: dict) -> str:
+    if card.get("suit") == "★":
+        return "大王" if card.get("rank") == "RJ" else "小王"
+    return f'{card.get("rank", "")}{card.get("suit", "")}'
+
+
+def _action_public(action) -> dict:
+    if not action or action[0] == "PASS":
+        return {"kind": "pass", "cards": [], "combination": None, "label": "不出"}
+    cards = _cards(action[2], "review")
+    combo = _combo(action)
+    labels = {
+        "single": "单张", "pair": "对子", "triple": "三张", "full_house": "三带二",
+        "straight": "顺子", "consecutive_pairs": "三连对", "consecutive_triples": "钢板",
+        "straight_flush": "同花顺", "rank_bomb": "炸弹", "joker_bomb": "四王",
+    }
+    kind = labels.get((combo or {}).get("type", ""), "出牌")
+    return {
+        "kind": "play",
+        "cards": cards,
+        "combination": combo,
+        "label": f'{kind} {" ".join(_card_text(card) for card in cards)}'.strip(),
+    }
+
+
+def _same_action(left, right) -> bool:
+    if not left or not right:
+        return False
+    if left[0] == "PASS" or right[0] == "PASS":
+        return left[0] == right[0] == "PASS"
+    return left[0] == right[0] and sorted(left[2] or []) == sorted(right[2] or [])
+
+
+def _history_entry(index: int, player, action) -> dict:
+    is_pass = not action or action[0] == "PASS"
+    entry = {"index": index, "seat": SEATS[int(player)], "kind": "pass" if is_pass else "play"}
+    if not is_pass:
+        entry["cards"] = _cards(action[2], f"history-{index}")
+        entry["combination"] = _combo(action)
+    return entry
+
+
+def _history_from_trace(trace) -> list[dict]:
+    return [_history_entry(index, player, action) for index, (player, action) in enumerate(trace or [], start=1)]
+
+
+def _human_turn(index: int, played, advice, greater_pos, hand_size: int) -> dict:
+    played_pub = _action_public(played)
+    advice_pub = _action_public(advice) if advice else None
+    followed = bool(advice) and _same_action(played, advice)
+    covered = int(greater_pos or -1) == 2 and played and played[0] != "PASS"
+    went_out = bool(played) and played[0] != "PASS" and len(played[2] or []) == hand_size
+    if went_out:
+        verdict, note = "走牌", "这手把自己打光了。"
+    elif covered:
+        verdict, note = "压对家", "对家在控牌时压了自己人。"
+    elif advice_pub is None:
+        verdict, note = "自打", "这一手没有对照教练。"
+    elif followed:
+        verdict, note = "一致", "和教练建议相同。"
+    else:
+        verdict, note = "不同", f"教练建议{advice_pub['label']}，你出了{played_pub['label']}。"
+    return {
+        "index": index,
+        "played": played_pub,
+        "advice": advice_pub,
+        "followed": followed,
+        "coveredPartner": covered and not went_out,
+        "wentOut": went_out,
+        "verdict": verdict,
+        "note": note,
+    }
+
+
+def _review_summary(deals: list[dict]) -> dict:
+    turns = [turn for deal in deals for turn in deal.get("yourTurns") or []]
+    advised = [turn for turn in turns if turn.get("advice")]
+    followed = sum(1 for turn in advised if turn.get("followed"))
+    covers = sum(1 for turn in turns if turn.get("coveredPartner"))
+    if not turns:
+        headline = "还没有你的出牌，打完一手就可以对照。"
+        detail = "复盘会记下你的每一手，以及当时教练怎么建议。"
+    elif covers:
+        headline = f"有 {covers} 手压了对家，这是最亏的地方。"
+        detail = f"你出了 {len(turns)} 手。有教练对照的 {len(advised)} 手里，{followed} 手一致。"
+    elif advised and followed == len(advised):
+        headline = f"这 {len(advised)} 手都和教练一致。"
+        detail = "没有压对家。还可以在记录里把每一手点开看。"
+    elif advised:
+        headline = f"有 {len(advised) - followed} 手和教练不同，值得对照。"
+        detail = f"你出了 {len(turns)} 手，其中 {followed}/{len(advised)} 手跟建议相同。"
+    else:
+        headline = f"你出了 {len(turns)} 手，当时没有教练对照。"
+        detail = "下一局打开自动建议，复盘就能看出哪些手更稳。"
+    return {
+        "yourTurns": len(turns),
+        "followed": followed,
+        "advised": len(advised),
+        "partnerCovers": covers,
+        "headline": headline,
+        "detail": detail,
+    }
+
+
 def _move_analyses(history: list[dict]) -> list[dict]:
     analyses = []
     labels = {"south": "你", "east": "下家", "north": "对家", "west": "上家"}
@@ -125,6 +230,9 @@ class PolicyGame:
         self._advisor = None
         self._advice_cache_key: int | None = None
         self._advice_cache_action = None
+        self._pending_human = None
+        self._human_turns: list[dict] = []
+        self._deal_reviews: list[dict] = []
         self.last_deal: dict | None = None
 
     def view(self) -> dict:
@@ -135,15 +243,7 @@ class PolicyGame:
         env = self.env
         current = env.get_player_id()
         state = env.get_state(current)
-        trace = state.get("trace", [])
-        history = []
-        for index, (player, action) in enumerate(trace, start=1):
-            is_pass = not action or action[0] == "PASS"
-            entry = {"index": index, "seat": SEATS[int(player)], "kind": "pass" if is_pass else "play"}
-            if not is_pass:
-                entry["cards"] = _cards(action[2], f"history-{index}")
-                entry["combination"] = _combo(action)
-            history.append(entry)
+        history = _history_from_trace(state.get("trace", []))
 
         greater = state.get("greaterAction")
         greater_pos = state.get("greaterPos", -1)
@@ -173,6 +273,7 @@ class PolicyGame:
             "opponentLevel": _rank_label(rank_list[1] if len(rank_list) > 1 else 0),
             "winnerTeam": None if env.game.winner_team < 0 else ("you" if env.game.winner_team == 0 else "opponent"),
             "lastDeal": self.last_deal,
+            "review": self._review(),
             "policy": {"name": self.opponent_policy, "kind": "learned" if self.opponent_policy == "danzero" else "baseline"},
             "settings": {"seed": self.advisor_seed, "opponentPolicy": self.opponent_policy},
         }
@@ -183,9 +284,16 @@ class PolicyGame:
                 raise ValueError("现在不是你的回合")
             codes = [] if passed else [value.split(":")[-2] for value in card_ids]
             action = ["PASS", "PASS", "PASS"] if passed else self._find_action(codes)
-            legal = self._match_action(action, self.env.get_state(0).get("actions", []))
+            state = self.env.get_state(0)
+            legal = self._match_action(action, state.get("actions", []))
             if legal is None:
                 raise ValueError("动作不合法或已过期，请重新选择")
+            self._pending_human = {
+                "played": legal,
+                "advice": self._advice_cache_action,
+                "greater_pos": int(state.get("greaterPos", -1) or -1),
+                "hand_size": len(state.get("current_hand") or []),
+            }
             return self._apply_action(legal)
 
     def act_ai(self) -> dict:
@@ -207,8 +315,13 @@ class PolicyGame:
 
     def _apply_action(self, action) -> dict:
         previous = self._deal_snapshot()
+        player = self.env.get_player_id()
+        history_before = _history_from_trace(self.env.get_state(player).get("trace", []))
+        if self._pending_human:
+            self._human_turns.append(_human_turn(len(history_before) + 1, **self._pending_human))
+            self._pending_human = None
         next_state, _ = self.env.step(action)
-        self._note_deal_change(previous)
+        self._note_deal_change(previous, history_before, player, action)
         self._sync_advisor(next_state)
         return self._view()
 
@@ -222,7 +335,7 @@ class PolicyGame:
             "opponentLevel": int(game.team1_rank),
         }
 
-    def _note_deal_change(self, previous: dict) -> None:
+    def _note_deal_change(self, previous: dict, history_before: list[dict], player: int, action) -> None:
         game = self.env.game
         if game.game_count == previous["number"] and not game.is_over():
             return
@@ -233,9 +346,13 @@ class PolicyGame:
         else:
             winner_team = previous["result"][0] % 2 if previous["result"] else 0
         kind = _finish_kind(previous["result"])
+        finished = [SEATS[p] for p in previous["result"]]
+        history = list(history_before)
+        if action:
+            history.append(_history_entry(len(history_before) + 1, player, action))
         self.last_deal = {
             "number": previous["number"],
-            "finished": [SEATS[p] for p in previous["result"]],
+            "finished": finished,
             "winnerTeam": "you" if winner_team == 0 else "opponent",
             "yourTeamWon": winner_team == 0,
             "kind": kind,
@@ -244,6 +361,14 @@ class PolicyGame:
             "opponentLevel": _rank_label(game.team1_rank),
             "matchOver": bool(game.is_over()),
         }
+        your_finish = FINISH_LABELS[finished.index("south")] if "south" in finished else None
+        self._deal_reviews.append({
+            **self.last_deal,
+            "yourFinish": your_finish,
+            "history": history,
+            "yourTurns": self._human_turns,
+        })
+        self._human_turns = []
         self._advice_cache_key = None
         self._advice_cache_action = None
         if self._advisor is not None:
@@ -283,8 +408,44 @@ class PolicyGame:
                 return action
         raise ValueError("所选牌不是当前合法出牌")
 
+    def _review(self) -> dict:
+        deals = list(self._deal_reviews)
+        if not self.env.is_over():
+            live_history = _history_from_trace(self.env.get_state(self.env.get_player_id()).get("trace", []))
+            if live_history or self._human_turns:
+                rank_list = list(getattr(self.env.game, "round").rank_list)
+                finished = [SEATS[p] for p in getattr(self.env.game.round, "result", []) if p >= 0]
+                deals.append({
+                    "number": int(getattr(self.env.game, "game_count", 1)),
+                    "finished": finished,
+                    "winnerTeam": None,
+                    "yourTeamWon": None,
+                    "kind": None,
+                    "levelGain": 0,
+                    "yourLevel": _rank_label(rank_list[0] if rank_list else 0),
+                    "opponentLevel": _rank_label(rank_list[1] if len(rank_list) > 1 else 0),
+                    "matchOver": False,
+                    "yourFinish": FINISH_LABELS[finished.index("south")] if "south" in finished else None,
+                    "history": live_history,
+                    "yourTurns": self._human_turns,
+                    "open": True,
+                })
+        return {"deals": deals, "summary": _review_summary(deals)}
+
     def advise(self) -> dict:
         with self.lock:
+            if self.env.is_over():
+                review = self._review()
+                return {
+                    "provider": "policy:danzero", "recommendation": review["summary"]["headline"],
+                    "cardIds": [], "combination": None,
+                    "rationale": review["summary"]["detail"],
+                    "alternatives": [],
+                    "assumptions": ["复盘只对照已经记下的出牌和当时的教练建议"],
+                    "confidence": 0,
+                    "moveAnalyses": [],
+                    "policy": {"name": "DanZero", "action": None, "legalActionCount": 0},
+                }
             if not self._waiting_for_human() or self.env.get_player_id() != 0:
                 raise ValueError("AI 教练只能在你的回合分析")
             state = self.env.get_state(0)

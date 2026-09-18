@@ -7,7 +7,7 @@ from openai import OpenAI
 
 
 SYSTEM_PROMPT = """你是 OpenCards 的掼蛋教练。
-根据当前公开牌面回答玩家的问题。讲清楚利弊，区分事实、推断和不确定之处。不要编造别人手里的牌、模型分数或非法出牌。对比另一种打法时，先对照合法出牌。用简体中文，具体但别啰嗦。"""
+根据当前公开牌面回答玩家的问题。讲清楚利弊，区分事实、推断和不确定之处。不要编造别人手里的牌、模型分数或非法出牌。对比另一种打法时，先对照合法出牌。如果上下文里有 review，按记录复盘：对照玩家实际出牌和当时教练建议，点出压对家、浪费大牌或可以走牌的地方。不要编造没记下的手。用简体中文，具体但别啰嗦。"""
 
 
 def ask_copilot(game_state: dict, recommendation: dict, message: str, conversation: list[dict], reasoning_effort: str = "medium", coaching_style: str = "detailed") -> dict:
@@ -27,6 +27,7 @@ def ask_copilot(game_state: dict, recommendation: dict, message: str, conversati
         "currentPlay": game_state.get("currentPlay"),
         "history": game_state["history"],
         "legalActions": game_state.get("legalActions", []),
+        "review": game_state.get("review"),
         "policyRecommendation": recommendation,
     }
     dialogue = [

@@ -460,6 +460,25 @@ button:disabled { cursor: default; }
 .tableOverlay small { color: #d9ad49; font-size: 11px; letter-spacing: .08em; }
 .tableOverlay h2 { margin: 0; font-size: 22px; }
 .tableOverlay p { margin: 0; color: #b7c8bd; font-size: 13px; line-height: 1.5; }
+.overlayActions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 6px; }
+.resultBar {
+  position: absolute;
+  z-index: 12;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #4f7f66;
+  border-radius: 14px;
+  background: #143725f2;
+  backdrop-filter: blur(12px);
+}
+.resultBar b { display: block; font-size: 15px; }
+.resultBar span { color: #b7c8bd; font-size: 12px; line-height: 1.45; }
 .error {
   margin: 10px 0 0;
   padding: 10px 12px;
@@ -623,19 +642,56 @@ button:disabled { cursor: default; }
 .copilotComposer button:disabled { background: #343d37; color: #6f7a72; }
 .actionLog { display: grid; align-content: start; gap: 5px; }
 .logRow {
+  width: 100%;
   min-height: 52px;
   padding: 8px;
   display: grid;
   grid-template-columns: 30px 56px 1fr;
   align-items: center;
   gap: 6px;
+  border: 0;
   border-radius: 7px;
   background: var(--panel-2);
+  color: inherit;
   font-size: 12px;
+  text-align: left;
 }
+.logRow.yours { box-shadow: inset 0 0 0 1px #3d6a4e66; }
+.logRow.focused, .reviewTurn.focused { box-shadow: 0 0 0 1px #d8aa43; }
 .logRow .playedCards { grid-column: 2 / -1; justify-self: start; display: flex; flex-wrap: wrap; gap: 3px; }
 .logRow > span { color: #768179; }
 .logRow > em, .logRow > i { color: #d9ad49; font-style: normal; }
+.review { display: grid; align-content: start; gap: 16px; }
+.reviewSummary { display: grid; gap: 6px; }
+.reviewSummary small { color: #d9ad49; font-size: 11px; letter-spacing: .08em; }
+.reviewSummary h3 { margin: 0; color: #f0e5c9; font-size: 18px; line-height: 1.35; }
+.reviewSummary p { margin: 0; color: #aeb8b1; font-size: 13px; line-height: 1.6; }
+.reviewStats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
+.reviewStats span { padding: 8px; display: grid; gap: 2px; border-radius: 8px; background: var(--panel-2); color: #8f9b93; font-size: 11px; }
+.reviewStats b { color: #e6ebe7; font-size: 16px; }
+.reviewDeal { display: grid; gap: 7px; }
+.reviewDeal header { display: flex; justify-content: space-between; gap: 8px; color: #c2cbc5; font-size: 13px; }
+.reviewEmpty { margin: 0; color: #87938b; font-size: 12px; }
+.reviewTurn {
+  width: 100%;
+  padding: 10px;
+  display: grid;
+  gap: 3px;
+  border: 1px solid #2c352f;
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: inherit;
+  text-align: left;
+}
+.reviewTurn.bad { border-color: #8a3d3d; }
+.reviewTurn.good { border-color: #3d6a4e; }
+.reviewTurn.diff { border-color: #7a6230; }
+.reviewTurn.out { border-color: #d8aa43; }
+.reviewTurn em { color: #d9ad49; font-size: 11px; font-style: normal; }
+.reviewTurn.bad em { color: #ffb0a9; }
+.reviewTurn.good em { color: #9ad4b0; }
+.reviewTurn strong { font-size: 13px; }
+.reviewTurn span, .reviewTurn p { margin: 0; color: #8f9b93; font-size: 12px; }
 
 /* ── Breakpoints ── */
 @media (max-width: 960px) {
@@ -700,6 +756,8 @@ button:disabled { cursor: default; }
     border-top: 1px solid var(--line);
   }
   .coachPanel, .history { padding: 10px 12px; }
+  .resultBar { grid-template-columns: 1fr; }
+  .resultBar .primary, .resultBar .secondary { width: 100%; }
   .coachAnalysis h3 { font-size: 16px; }
   .training header span { display: none; }
   .importPanel form { grid-template-columns: 1fr auto; }

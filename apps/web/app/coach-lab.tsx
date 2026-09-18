@@ -13,6 +13,20 @@ type LastDeal = {
 };
 type AIAdvice = { provider: string; recommendation: string; cardIds: string[]; combination?: Combo; rationale: string; alternatives: string[]; assumptions: string[]; confidence: number; moveAnalyses: { index: number; seat: string; summary: string; impact: string }[] };
 type ChatMessage = { role: "user" | "assistant"; content: string };
+type ReviewAction = { kind: "play" | "pass"; cards: Card[]; combination?: Combo | null; label: string };
+type ReviewTurn = {
+  index: number; played: ReviewAction; advice: ReviewAction | null; followed: boolean;
+  coveredPartner: boolean; wentOut: boolean; verdict: string; note: string;
+};
+type ReviewDeal = {
+  number: number; finished: string[]; winnerTeam: "you" | "opponent" | null; yourTeamWon: boolean | null;
+  kind: string | null; levelGain: number; yourLevel: string; opponentLevel: string; matchOver: boolean;
+  yourFinish: string | null; history: Action[]; yourTurns: ReviewTurn[]; open?: boolean;
+};
+type Review = {
+  deals: ReviewDeal[];
+  summary: { yourTurns: number; followed: number; advised: number; partnerCovers: number; headline: string; detail: string };
+};
 type Game = {
   id: string; game: "guandan"; levelRank: string; yourSeat: "south"; yourHand: Card[];
   counts: Record<"south" | "west" | "north" | "east", number>;
@@ -20,7 +34,7 @@ type Game = {
   history: Action[]; finished: string[]; gameOver: boolean; createdAt: string;
   waitingForHuman: boolean; legalActions: LegalAction[]; dealNumber: number;
   playTeam: "you" | "opponent"; yourLevel: string; opponentLevel: string;
-  winnerTeam: "you" | "opponent" | null; lastDeal: LastDeal | null;
+  winnerTeam: "you" | "opponent" | null; lastDeal: LastDeal | null; review: Review;
   settings: { seed: number | null; opponentPolicy: string };
 };
 
@@ -36,6 +50,8 @@ const kindLabels: Record<string, string> = { double_up: "双上", first_third: "
 
 function cardCode(card: Card) { return card.id.split(":")[1]; }
 function sortedCodes(codes: string[]) { return [...codes].sort().join(","); }
+const verdictClass: Record<string, string> = { 压对家: "bad", 一致: "good", 不同: "diff", 走牌: "out", 自打: "solo" };
+
 function comboLabel(value?: string) {
   const labels: Record<string, string> = {
     single: "单张", pair: "对子", triple: "三张", full_house: "三带二", straight: "顺子",
@@ -52,7 +68,8 @@ export function CoachLab() {
   const [loading, setLoading] = useState(false);
   const [coachLoading, setCoachLoading] = useState(false);
   const [aiAdvice, setAIAdvice] = useState<AIAdvice | null>(null);
-  const [copilotTab, setCopilotTab] = useState<"coach" | "history">("coach");
+  const [copilotTab, setCopilotTab] = useState<"coach" | "review">("coach");
+  const [focusedPlay, setFocusedPlay] = useState<Action | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -74,7 +91,7 @@ export function CoachLab() {
   const dragged = useRef(new Set<string>());
 
   const dealCards = useCallback(async () => {
-    setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]); setSeatPlays({}); setDealNotice(null);
+    setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]); setSeatPlays({}); setDealNotice(null); setFocusedPlay(null); setCopilotTab("coach");
     try {
       const response = await fetch(`${api}/v1/games/guandan/deals`, {
         method: "POST",
@@ -135,6 +152,8 @@ export function CoachLab() {
   }, [autoCoach, game?.id, game?.waitingForHuman, game?.history.length, game?.dealNumber]);
 
   function placeLatestAction(previous: Game, next: Game) {
+    setFocusedPlay(null);
+    if (next.gameOver) setCopilotTab("review");
     if (next.lastDeal && next.lastDeal.number !== (previous.lastDeal?.number ?? -1)) {
       setDealNotice(next.lastDeal);
       setSeatPlays({});
@@ -194,7 +213,6 @@ export function CoachLab() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "教练暂不可用");
       setAIAdvice(body);
-      setSelected((current) => current.length > 0 ? current : body.cardIds ?? []);
     } catch (caught) {
       if (force || autoCoach) setError(caught instanceof Error ? caught.message : "教练暂不可用");
     } finally {
@@ -296,11 +314,30 @@ export function CoachLab() {
     return groups;
   }, []) ?? [];
   const selectedIllegal = yourTurn && selected.length > 0 && !matchedAction;
+  const tablePlay = focusedPlay ?? game?.currentPlay;
   const statusText = game?.gameOver
     ? (game.winnerTeam === "you" ? "你们过级获胜" : "对家过级获胜")
     : yourTurn
       ? "轮到你出牌"
       : `${seatLabels[game?.turn ?? ""] ?? "AI"} ${aiThinkingSeat ? "思考中" : "出牌中"}`;
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!yourTurn || loading) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("textarea, input, select")) return;
+      if (event.key === "Enter" && matchedAction) {
+        event.preventDefault();
+        void act(false);
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSelected([]);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [yourTurn, loading, matchedAction]);
 
   return <main className="arena">
     <div className="playWorkspace">
@@ -333,8 +370,8 @@ export function CoachLab() {
           ))}
           <SeatPlay action={yourTurn ? undefined : seatPlays.south} className="southPlay" />
           <div className="tableCenter">
-            <b>{game?.currentPlay ? comboLabel(game.currentPlay.combination?.type) : "任意合法牌型领出"}</b>
-            <span>{game?.currentPlay ? `${seatLabels[game.currentPlay.seat]} 控牌` : "新一轮"}</span>
+            <b>{tablePlay ? comboLabel(tablePlay.combination?.type) : "任意合法牌型领出"}</b>
+            <span>{tablePlay ? `${seatLabels[tablePlay.seat]}${focusedPlay ? " 这一手" : " 控牌"}` : "新一轮"}</span>
           </div>
           <div className="tableHand">
             <div className="tableActions">
@@ -361,7 +398,9 @@ export function CoachLab() {
                 ))}
               </div>
             )}
-            {selectedIllegal && <p className="playHint">选中的牌不是当前合法牌型，点「提示」可轮换可出组合</p>}
+            {selectedIllegal && <p className="playHint">这手不是当前合法牌型。点「提示」轮换可出组合，Esc 取消选择。</p>}
+            {yourTurn && matchedAction && <p className="playHint">已选 {comboLabel(matchedAction.combination?.type)}，回车出牌。</p>}
+            {yourTurn && selected.length === 0 && !coachLoading && <p className="playHint">点选或滑动选牌。教练只标黄，不会替你出。</p>}
           </div>
         </div>
         {dealNotice && !game?.gameOver && (
@@ -371,19 +410,21 @@ export function CoachLab() {
               <h2>{dealNotice.yourTeamWon ? "我方升过这副" : "对方升过这副"}</h2>
               <p>{kindLabels[dealNotice.kind] ?? "本副结束"}，升 {dealNotice.levelGain} 级。进贡已自动完成。</p>
               <p>完成顺序：{dealNotice.finished.map((seat, index) => `${finishLabels[index]} ${seatLabels[seat]}`).join(" · ")}</p>
-              <button className="primary" type="button" onClick={() => setDealNotice(null)}>继续下一副</button>
+              <div className="overlayActions">
+                <button className="secondary" type="button" onClick={() => { setDealNotice(null); setCopilotTab("review"); }}>先看复盘</button>
+                <button className="primary" type="button" onClick={() => setDealNotice(null)}>继续下一副</button>
+              </div>
             </div>
           </div>
         )}
         {game?.gameOver && (
-          <div className="tableOverlay" role="dialog">
+          <div className="resultBar" role="status">
             <div>
-              <small>整局结束</small>
-              <h2>{game.winnerTeam === "you" ? "你们打过 A，获胜" : "对方打过 A，本局失利"}</h2>
-              <p>我方 {game.yourLevel} · 对方 {game.opponentLevel}</p>
-              {game.lastDeal && <p>末副顺序：{game.lastDeal.finished.map((seat, index) => `${finishLabels[index]} ${seatLabels[seat]}`).join(" · ")}</p>}
-              <button className="primary" type="button" onClick={() => void dealCards()}>再来一局</button>
+              <b>{game.winnerTeam === "you" ? "你们过级获胜" : "对方过级获胜"}</b>
+              <span>{game.review?.summary.headline ?? `我方 ${game.yourLevel} · 对方 ${game.opponentLevel}`}</span>
             </div>
+            <button className="secondary" type="button" onClick={() => setCopilotTab("review")}>看复盘</button>
+            <button className="primary" type="button" disabled={loading} onClick={() => void dealCards()}>再来一局</button>
           </div>
         )}
         {error && <p className="error" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label="关闭">×</button></p>}
@@ -407,8 +448,8 @@ export function CoachLab() {
               <ol>
                 <li>点选或滑动选牌，合法组合才会点亮「出牌」。</li>
                 <li>跟牌必须压过当前牌型，否则点「不出」。</li>
-                <li>「提示」轮换当前能出的牌；右侧建议可以一键打出。</li>
-                <li>打过 A 的一方获胜，进贡会自动处理。</li>
+                <li>「提示」轮换当前能出的牌；右侧建议只作参考，点「打出建议」才出。</li>
+                <li>打过 A 的一方获胜。每副和整局结束都能看复盘，对照你出的牌和教练建议。</li>
               </ol>
               <button className="primary" type="button" onClick={() => setHelpOpen(false)}>知道了</button>
             </div>
@@ -430,7 +471,7 @@ export function CoachLab() {
       <aside className="copilot" aria-label="教练">
         <div className="copilotTabs">
           <button className={copilotTab === "coach" ? "active" : ""} onClick={() => setCopilotTab("coach")}>教练</button>
-          <button className={copilotTab === "history" ? "active" : ""} onClick={() => setCopilotTab("history")}>记录 <small>{game?.history.length ?? 0}</small></button>
+          <button className={copilotTab === "review" ? "active" : ""} onClick={() => setCopilotTab("review")}>复盘 <small>{game?.review?.summary.yourTurns ?? 0}</small></button>
         </div>
         {copilotTab === "coach" ? <>
           <div className="coachPanel" ref={coachPanelRef}>
@@ -449,12 +490,77 @@ export function CoachLab() {
             <textarea aria-label="问教练" rows={2} value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendCopilotMessage(); } }} placeholder="问这一手怎么打…" />
             <button type="submit" aria-label="发送" disabled={!chatDraft.trim() || chatLoading}>↑</button>
           </form>
-        </> : <section className="history" aria-label="出牌记录">
-          <div className="actionLog">{game?.history.map((action) => <div className="logRow" key={action.index}><span>#{action.index}</span><b>{seatLabels[action.seat]}</b>{action.kind === "pass" ? <i>不出</i> : <><em>{comboLabel(action.combination?.type)}</em><div className="playedCards">{action.cards?.map((card) => <MiniCard card={card} key={card.id} />)}</div></>}</div>)}</div>
-        </section>}
+        </> : <ReviewPanel
+          review={game?.review}
+          focused={focusedPlay}
+          onFocus={(action) => {
+            setFocusedPlay(action);
+            setSeatPlays({ [action.seat]: action });
+          }}
+        />}
       </aside>
     </div>
   </main>;
+}
+
+function ReviewPanel({ review, focused, onFocus }: { review?: Review; focused: Action | null; onFocus: (action: Action) => void }) {
+  if (!review || (review.deals.length === 0 && review.summary.yourTurns === 0)) {
+    return <section className="history" aria-label="复盘"><div className="coachEmpty">出过牌之后，这里会记下你的每一手，以及当时教练怎么建议。</div></section>;
+  }
+  return <section className="history review" aria-label="复盘">
+    <div className="reviewSummary">
+      <small>复盘</small>
+      <h3>{review.summary.headline}</h3>
+      <p>{review.summary.detail}</p>
+      <div className="reviewStats">
+        <span><b>{review.summary.yourTurns}</b>你的出牌</span>
+        <span><b>{review.summary.followed}/{review.summary.advised || 0}</b>跟教练</span>
+        <span><b>{review.summary.partnerCovers}</b>压对家</span>
+      </div>
+    </div>
+    {review.deals.map((deal) => (
+      <article className="reviewDeal" key={`${deal.number}-${deal.open ? "open" : "done"}`}>
+        <header>
+          <b>第 {deal.number} 副</b>
+          <span>{deal.open ? "进行中" : deal.yourTeamWon ? "我方升过" : deal.yourTeamWon === false ? "对方升过" : "本副"}{deal.yourFinish ? ` · 你${deal.yourFinish}` : ""}</span>
+        </header>
+        {deal.yourTurns.length === 0 ? <p className="reviewEmpty">这副还没有你的出牌。</p> : deal.yourTurns.map((turn) => (
+          <button
+            type="button"
+            className={`reviewTurn ${verdictClass[turn.verdict] ?? ""} ${focused?.index === turn.index ? "focused" : ""}`}
+            key={`${deal.number}-${turn.index}`}
+            onClick={() => onFocus({
+              index: turn.index,
+              seat: "south",
+              kind: turn.played.kind,
+              cards: turn.played.cards,
+              combination: turn.played.combination ?? undefined,
+            })}
+          >
+            <em>{turn.verdict}</em>
+            <strong>你 {turn.played.label}</strong>
+            {turn.advice && !turn.followed && <span>教练 {turn.advice.label}</span>}
+            <p>{turn.note}</p>
+            {turn.played.cards.length > 0 && <div className="playedCards">{turn.played.cards.map((card) => <MiniCard card={card} key={card.id} />)}</div>}
+          </button>
+        ))}
+        <div className="actionLog">
+          {deal.history.map((action) => (
+            <button
+              type="button"
+              className={`logRow ${focused?.index === action.index && focused.seat === action.seat ? "focused" : ""} ${action.seat === "south" ? "yours" : ""}`}
+              key={`${deal.number}-h-${action.index}`}
+              onClick={() => onFocus(action)}
+            >
+              <span>#{action.index}</span>
+              <b>{seatLabels[action.seat]}</b>
+              {action.kind === "pass" ? <i>不出</i> : <><em>{comboLabel(action.combination?.type)}</em><div className="playedCards">{action.cards?.map((card) => <MiniCard card={card} key={card.id} />)}</div></>}
+            </button>
+          ))}
+        </div>
+      </article>
+    ))}
+  </section>;
 }
 
 function Player({ className, label, role, count, active, thinking, action, finish }: { className: string; label: string; role: string; count: number; active: boolean; thinking: boolean; action?: Action; finish: number }) {

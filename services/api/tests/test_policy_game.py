@@ -1,4 +1,4 @@
-from opencards_api.game import PolicyGame
+from opencards_api.game import PolicyGame, _human_turn
 
 
 def _advance_to_human(game):
@@ -19,6 +19,31 @@ def _play_legal(game, action):
             ids.append(card["id"])
             remaining.remove(code)
     return game.act(ids, False)
+
+
+def test_review_marks_covering_partner_and_following_coach():
+    flush = ["StraightFlush", "8", ["C4", "C5", "C6", "C7", "C8"]]
+    stay = ["PASS", "PASS", "PASS"]
+    covered = _human_turn(4, flush, stay, 2, 12)
+    assert covered["verdict"] == "压对家"
+    assert covered["coveredPartner"] is True
+    followed = _human_turn(5, stay, stay, 2, 12)
+    assert followed["verdict"] == "一致"
+    assert followed["followed"] is True
+
+
+def test_review_records_a_human_turn_against_coach():
+    game = PolicyGame(seed=42, opponent_policy="random")
+    before = _advance_to_human(game)
+    advice = game.advise()
+    after = game.act(advice["cardIds"], not advice["cardIds"])
+    review = after["review"]
+    assert before["review"]["summary"]["yourTurns"] == 0
+    assert review["summary"]["yourTurns"] == 1
+    assert review["summary"]["followed"] == 1
+    turn = review["deals"][-1]["yourTurns"][0]
+    assert turn["followed"] is True
+    assert turn["played"]["kind"] in {"play", "pass"}
 
 
 def test_coach_passes_instead_of_covering_partner_with_a_straight_flush():
@@ -97,6 +122,9 @@ def test_complete_match_reaches_a_real_engine_result():
     assert sum(game.env.game.gwin) > 0
     assert game.view()["winnerTeam"] in {"you", "opponent"}
     assert game.view()["lastDeal"]
+    review = game.view()["review"]
+    assert review["deals"]
+    assert review["summary"]["yourTurns"] >= 1
 
 
 def test_random_match_keeps_playing_after_the_human_goes_out():
