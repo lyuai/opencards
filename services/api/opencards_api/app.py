@@ -20,7 +20,10 @@ load_dotenv(PROJECT_ROOT / ".env", override=False)
 def create_app(testing: bool = False) -> Flask:
     app = Flask(__name__)
     app.config["TESTING"] = testing
-    origins = [item.strip() for item in os.getenv("WEB_ORIGIN", "http://localhost:3000").split(",") if item.strip()]
+    origins = [item.strip() for item in os.getenv(
+        "WEB_ORIGIN",
+        "http://localhost:3000,https://dan.lyu.ai,https://opencards-web.onrender.com",
+    ).split(",") if item.strip()]
     CORS(app, origins=origins)
     data_dir = Path(os.getenv("OPENCARDS_DATA_DIR", Path(__file__).parents[1] / "data"))
     games = GameStore()

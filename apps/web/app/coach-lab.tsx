@@ -59,7 +59,6 @@ export function CoachLab() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dealSeed, setDealSeed] = useState("");
-  const [opponentPolicy, setOpponentPolicy] = useState("base7");
   const [autoCoach, setAutoCoach] = useState(true);
   const [confirmPlay, setConfirmPlay] = useState(false);
   const [compactCards, setCompactCards] = useState(false);
@@ -80,7 +79,7 @@ export function CoachLab() {
       const response = await fetch(`${api}/v1/games/guandan/deals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opponentPolicy, seed: dealSeed === "" ? null : Number(dealSeed) }),
+        body: JSON.stringify({ opponentPolicy: "danzero", seed: dealSeed === "" ? null : Number(dealSeed) }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "无法开局");
@@ -92,16 +91,7 @@ export function CoachLab() {
     } finally {
       setLoading(false);
     }
-  }, [api, autoCoach, dealSeed, opponentPolicy]);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem("opencards.opponent");
-    if (stored === "base7" || stored === "danzero" || stored === "random") setOpponentPolicy(stored);
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem("opencards.opponent", opponentPolicy);
-  }, [opponentPolicy]);
+  }, [api, autoCoach, dealSeed]);
 
   useEffect(() => {
     if (copilotTab !== "coach" || (chatMessages.length === 0 && !chatLoading)) return;
@@ -120,7 +110,7 @@ export function CoachLab() {
     let cancelled = false;
     const actingSeat = game.turn === "south" ? null : game.turn;
     setAIThinkingSeat(actingSeat);
-    const delay = game.settings.opponentPolicy === "danzero" ? 850 : 420;
+    const delay = 850;
     const timer = window.setTimeout(async () => {
       try {
         const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/ai-actions`, { method: "POST" });
@@ -403,14 +393,7 @@ export function CoachLab() {
               <i className="brandMark lg" aria-hidden="true" />
               <small>OPENCARDS</small>
               <h1 id="lobby-title">坐下，打一局掼蛋</h1>
-              <p>你坐南家，对家是队友。教练看着公开牌面给建议，出不出由你定。</p>
-              <label>对手
-                <select value={opponentPolicy} onChange={(event) => setOpponentPolicy(event.target.value)}>
-                  <option value="base7">规则 AI</option>
-                  <option value="danzero">强力 AI</option>
-                  <option value="random">随机</option>
-                </select>
-              </label>
+              <p>你坐南家，对家是队友。三个电脑座位都是 DanZero，教练看着公开牌面给建议。</p>
               <button className="primary" type="button" disabled={loading} onClick={() => void dealCards()}>{loading ? "正在发牌…" : "开始对局"}</button>
               <button className="textLink" type="button" onClick={() => setHelpOpen(true)}>先看怎么打</button>
             </div>
@@ -432,7 +415,6 @@ export function CoachLab() {
           </div>
         )}
         {settingsOpen && <section className="gameSettings" aria-label="对局设置">
-          <label>对手<select value={opponentPolicy} onChange={(event) => setOpponentPolicy(event.target.value)}><option value="base7">规则 AI</option><option value="danzero">强力 AI</option><option value="random">随机</option></select></label>
           <label>教练讲解<select value={coachingStyle} onChange={(event) => setCoachingStyle(event.target.value)}><option value="direct">直接</option><option value="detailed">详细</option><option value="socratic">追问</option></select></label>
           <label><input type="checkbox" checked={autoCoach} onChange={(event) => { setAutoCoach(event.target.checked); if (!event.target.checked) setAIAdvice(null); }} />每手自动给建议</label>
           <label><input type="checkbox" checked={confirmPlay} onChange={(event) => setConfirmPlay(event.target.checked)} />出牌前确认</label>

@@ -31,10 +31,15 @@ npm run api
 - 点选或滑动选牌，合法组合才会点亮「出牌」。
 - 跟牌必须压过当前牌型，否则点「不出」。
 - 「提示」轮换当前能出的牌；右侧建议可以一键打出。
-- 默认对手是规则 AI。强力 AI 会加载捆绑的 DanZero 价值网络，更慢也更准。
+- 开局可选规则 AI、训练对手或强力 AI。训练对手只在引擎给出的合法出牌里做结构检索，适合本地对打。
 - 权威合法出牌来自 `rlcard-guandan`。语言模型只解释，不能改规则或发明置信度。
 
-跑 `npm run test:api` 会执行 HTTP / 整局回归，以及钉住的上游引擎测试。
+跑 `npm run test:api` 会执行 HTTP / 整局回归，以及钉住的上游引擎测试。本地评估：
+
+```sh
+npm run train:guandan -- --policy retrieval --baseline base7 --episodes 4
+```
+
 
 ## 仓库结构
 
