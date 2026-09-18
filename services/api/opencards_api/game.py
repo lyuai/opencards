@@ -567,9 +567,11 @@ class GameStore:
         self._lock = threading.RLock()
 
     def create(self, seed: int | None = None, opponent_policy: str = "danzero") -> PolicyGame:
+        from .persist import save_game
         game = PolicyGame(seed, opponent_policy)
         with self._lock:
             self._games[game.id] = game
+        save_game(game)
         return game
 
     def get(self, game_id: str) -> PolicyGame | None:

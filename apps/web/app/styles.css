@@ -124,6 +124,21 @@ button:disabled { cursor: default; }
   background: #0d130f;
   color: #e6ebe7;
 }
+.savedMatches { display: grid; gap: 6px; margin-top: 8px; text-align: left; }
+.savedMatches small { color: #d9ad49; font-size: 11px; letter-spacing: .08em; }
+.savedMatches button {
+  width: 100%;
+  padding: 8px 10px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid #3d5c4c;
+  border-radius: 8px;
+  background: #10251bbd;
+  color: inherit;
+  text-align: left;
+}
+.savedMatches b { font-size: 13px; }
+.savedMatches span { color: #aeb8b1; font-size: 12px; }
 .helpSheet ol { margin: 4px 0 8px; padding-left: 20px; text-align: left; }
 .helpSheet li + li { margin-top: 8px; }
 .howList {

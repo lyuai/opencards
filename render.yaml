@@ -30,6 +30,10 @@ projects:
                 value: google/gemini-3.8-flash
               - key: AI_API_KEY
                 sync: false
+              - key: SUPABASE_URL
+                value: https://nkeweprspefxpcxdmcwb.supabase.co
+              - key: SUPABASE_SERVICE_ROLE_KEY
+                sync: false
 
           - type: web
             name: opencards-web

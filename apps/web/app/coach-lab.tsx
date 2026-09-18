@@ -29,6 +29,10 @@ type Review = {
   deals: ReviewDeal[];
   summary: { yourTurns: number; followed: number; advised: number; partnerCovers: number; headline: string; detail: string };
 };
+type SavedMatch = {
+  id: string; createdAt: string; winnerTeam: "you" | "opponent" | null; yourLevel: string | null;
+  opponentLevel: string | null; gameOver: boolean; headline: string; review?: Review;
+};
 type Game = {
   id: string; game: "guandan"; levelRank: string; yourSeat: "south"; yourHand: Card[];
   counts: Record<"south" | "west" | "north" | "east", number>;
@@ -72,6 +76,8 @@ export function CoachLab() {
   const [aiAdvice, setAIAdvice] = useState<AIAdvice | null>(null);
   const [copilotTab, setCopilotTab] = useState<"coach" | "history">("coach");
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [savedMatches, setSavedMatches] = useState<SavedMatch[]>([]);
+  const [archive, setArchive] = useState<SavedMatch | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -93,7 +99,7 @@ export function CoachLab() {
   const dragged = useRef(new Set<string>());
 
   const dealCards = useCallback(async () => {
-    setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]); setSeatPlays({}); setDealNotice(null); setReviewOpen(false); setCopilotTab("coach");
+    setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]); setSeatPlays({}); setDealNotice(null); setReviewOpen(false); setArchive(null); setCopilotTab("coach");
     try {
       const response = await fetch(`${api}/v1/games/guandan/deals`, {
         method: "POST",
@@ -111,6 +117,31 @@ export function CoachLab() {
       setLoading(false);
     }
   }, [api, autoCoach, dealSeed]);
+
+  const loadSavedMatches = useCallback(async () => {
+    try {
+      const response = await fetch(`${api}/v1/games/guandan/matches`);
+      const body = await response.json();
+      if (response.ok) setSavedMatches(body.matches ?? []);
+    } catch {
+      setSavedMatches([]);
+    }
+  }, [api]);
+
+  useEffect(() => { void loadSavedMatches(); }, [loadSavedMatches]);
+  useEffect(() => { if (game?.gameOver) void loadSavedMatches(); }, [game?.gameOver, loadSavedMatches]);
+
+  async function openSavedMatch(id: string) {
+    try {
+      const response = await fetch(`${api}/v1/games/guandan/matches/${id}`);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "找不到这局复盘");
+      setArchive(body);
+      setReviewOpen(true);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "找不到这局复盘");
+    }
+  }
 
   useEffect(() => {
     if (copilotTab !== "coach" || (chatMessages.length === 0 && !chatLoading)) return;
@@ -340,12 +371,13 @@ export function CoachLab() {
     return () => window.removeEventListener("keydown", onKey);
   }, [yourTurn, loading, matchedAction]);
 
-  if (reviewOpen && game?.review) {
+  const review = game?.review ?? archive?.review;
+  if (reviewOpen && review) {
     return <ReviewView
-      review={game.review}
-      gameOver={game.gameOver}
-      winner={game.winnerTeam}
-      onClose={() => setReviewOpen(false)}
+      review={review}
+      gameOver={game?.gameOver ?? Boolean(archive?.gameOver)}
+      winner={game?.winnerTeam ?? archive?.winnerTeam ?? null}
+      onClose={() => { setReviewOpen(false); setArchive(null); }}
       onReplay={() => void dealCards()}
     />;
   }
@@ -449,6 +481,17 @@ export function CoachLab() {
               <p>你坐南家，对家是队友。三个电脑座位都是 DanZero，教练看着公开牌面给建议。</p>
               <button className="primary" type="button" disabled={loading} onClick={() => void dealCards()}>{loading ? "正在发牌…" : "开始对局"}</button>
               <button className="textLink" type="button" onClick={() => setHelpOpen(true)}>先看怎么打</button>
+              {savedMatches.length > 0 && (
+                <div className="savedMatches">
+                  <small>最近对局</small>
+                  {savedMatches.map((item) => (
+                    <button type="button" key={item.id} onClick={() => void openSavedMatch(item.id)}>
+                      <b>{item.gameOver ? (item.winnerTeam === "you" ? "获胜" : item.winnerTeam === "opponent" ? "失利" : "结束") : "进行中"}</b>
+                      <span>{item.headline}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

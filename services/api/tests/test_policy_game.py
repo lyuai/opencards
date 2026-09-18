@@ -1,4 +1,5 @@
 from opencards_api.game import PolicyGame, _human_turn
+from opencards_api.persist import match_snapshot
 
 
 def _advance_to_human(game):
@@ -48,6 +49,9 @@ def test_review_records_a_human_turn_against_coach():
     assert set(hands) == {"south", "west", "north", "east"}
     assert all(len(cards) == 27 for cards in hands.values())
     assert len(turn["hand"]) == 27
+    snap = match_snapshot(game)
+    assert snap["match"]["id"] == game.id
+    assert snap["deals"][-1]["opening_hands"]["south"]
 
 
 def test_coach_passes_instead_of_covering_partner_with_a_straight_flush():

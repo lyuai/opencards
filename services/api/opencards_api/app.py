@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from .copilot import ask_copilot
 from .game import GameStore
+from .persist import get_match, list_matches, save_game
 from .store import JobStore
 
 
@@ -48,7 +49,8 @@ def create_app(testing: bool = False) -> Flask:
             seed = body.get("seed")
             if seed is not None:
                 seed = int(seed)
-            return jsonify(games.create(seed=seed, opponent_policy=body.get("opponentPolicy", "danzero")).view()), 201
+            game = games.create(seed=seed, opponent_policy=body.get("opponentPolicy", "danzero"))
+            return jsonify(game.view()), 201
         except (TypeError, ValueError) as exc:
             return error(str(exc), 422)
         except Exception as exc:  # model load failures must be visible
@@ -62,7 +64,9 @@ def create_app(testing: bool = False) -> Flask:
             return error("game not found", 404)
         body = request.get_json(silent=True) or {}
         try:
-            return jsonify(game.act(body.get("cardIds", []), bool(body.get("pass"))))
+            view = game.act(body.get("cardIds", []), bool(body.get("pass")))
+            save_game(game)
+            return jsonify(view)
         except ValueError as exc:
             return error(str(exc), 422)
 
@@ -72,7 +76,9 @@ def create_app(testing: bool = False) -> Flask:
         if not game:
             return error("game not found", 404)
         try:
-            return jsonify(game.act_ai())
+            view = game.act_ai()
+            save_game(game)
+            return jsonify(view)
         except ValueError as exc:
             return error(str(exc), 409)
         except RuntimeError as exc:
@@ -109,6 +115,15 @@ def create_app(testing: bool = False) -> Flask:
         except Exception as exc:
             app.logger.exception("coach chat")
             return error("教练暂时答不上来", 502)
+
+    @app.get("/v1/games/guandan/matches")
+    def matches_index():
+        return jsonify(matches=list_matches())
+
+    @app.get("/v1/games/guandan/matches/<match_id>")
+    def match_review(match_id):
+        item = get_match(match_id)
+        return jsonify(item) if item else error("match not found", 404)
 
     @app.post("/v1/imports")
     def create_import():

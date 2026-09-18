@@ -78,6 +78,17 @@ def test_deal_accepts_reproducible_settings(tmp_path, monkeypatch):
     assert [card["rank"] + card["suit"] for card in first["yourHand"]] == [card["rank"] + card["suit"] for card in second["yourHand"]]
 
 
+def test_match_list_is_empty_without_supabase(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENCARDS_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    client = create_app(testing=True).test_client()
+    response = client.get("/v1/games/guandan/matches")
+    assert response.status_code == 200
+    assert response.get_json() == {"matches": []}
+    assert client.get("/v1/games/guandan/matches/missing").status_code == 404
+
+
 def test_deal_rejects_unknown_opponent_policy(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENCARDS_DATA_DIR", str(tmp_path))
     client = create_app(testing=True).test_client()
