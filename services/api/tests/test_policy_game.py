@@ -44,6 +44,10 @@ def test_review_records_a_human_turn_against_coach():
     turn = review["deals"][-1]["yourTurns"][0]
     assert turn["followed"] is True
     assert turn["played"]["kind"] in {"play", "pass"}
+    hands = review["deals"][-1]["openingHands"]
+    assert set(hands) == {"south", "west", "north", "east"}
+    assert all(len(cards) == 27 for cards in hands.values())
+    assert len(turn["hand"]) == 27
 
 
 def test_coach_passes_instead_of_covering_partner_with_a_straight_flush():

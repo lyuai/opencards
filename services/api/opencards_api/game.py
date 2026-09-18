@@ -128,12 +128,21 @@ def _history_from_trace(trace) -> list[dict]:
     return [_history_entry(index, player, action) for index, (player, action) in enumerate(trace or [], start=1)]
 
 
-def _human_turn(index: int, played, advice, greater_pos, hand_size: int) -> dict:
+def _all_hand_codes(game) -> dict[str, list[str]]:
+    return {SEATS[index]: list(cards2str(game.players[index].current_hand)) for index in range(4)}
+
+
+def _public_hands(codes_by_seat: dict[str, list[str]], prefix: str) -> dict[str, list[dict]]:
+    return {seat: _cards(codes, f"{prefix}-{seat}") for seat, codes in codes_by_seat.items()}
+
+
+def _human_turn(index: int, played, advice, greater_pos, hand_size: int, hand_codes=None) -> dict:
     played_pub = _action_public(played)
     advice_pub = _action_public(advice) if advice else None
     followed = bool(advice) and _same_action(played, advice)
     covered = int(greater_pos or -1) == 2 and played and played[0] != "PASS"
     went_out = bool(played) and played[0] != "PASS" and len(played[2] or []) == hand_size
+    hand = _cards(hand_codes or [], "turn-hand")
     if went_out:
         verdict, note = "走牌", "这手把自己打光了。"
     elif covered:
@@ -153,6 +162,7 @@ def _human_turn(index: int, played, advice, greater_pos, hand_size: int) -> dict
         "wentOut": went_out,
         "verdict": verdict,
         "note": note,
+        "hand": hand,
     }
 
 
@@ -233,6 +243,7 @@ class PolicyGame:
         self._pending_human = None
         self._human_turns: list[dict] = []
         self._deal_reviews: list[dict] = []
+        self._deal_opening_hands = _all_hand_codes(self.env.game)
         self.last_deal: dict | None = None
 
     def view(self) -> dict:
@@ -293,6 +304,7 @@ class PolicyGame:
                 "advice": self._advice_cache_action,
                 "greater_pos": int(state.get("greaterPos", -1) or -1),
                 "hand_size": len(state.get("current_hand") or []),
+                "hand_codes": list(state.get("current_hand") or []),
             }
             return self._apply_action(legal)
 
@@ -333,6 +345,7 @@ class PolicyGame:
             "gwin": list(game.gwin),
             "yourLevel": int(game.team0_rank),
             "opponentLevel": int(game.team1_rank),
+            "levelRank": int(getattr(game, "cur_rank", 0)),
         }
 
     def _note_deal_change(self, previous: dict, history_before: list[dict], player: int, action) -> None:
@@ -365,10 +378,14 @@ class PolicyGame:
         self._deal_reviews.append({
             **self.last_deal,
             "yourFinish": your_finish,
+            "levelRank": _rank_label(previous.get("levelRank", 0)),
+            "openingHands": _public_hands(self._deal_opening_hands, "open"),
             "history": history,
             "yourTurns": self._human_turns,
         })
         self._human_turns = []
+        if not game.is_over():
+            self._deal_opening_hands = _all_hand_codes(game)
         self._advice_cache_key = None
         self._advice_cache_action = None
         if self._advisor is not None:
@@ -426,6 +443,8 @@ class PolicyGame:
                     "opponentLevel": _rank_label(rank_list[1] if len(rank_list) > 1 else 0),
                     "matchOver": False,
                     "yourFinish": FINISH_LABELS[finished.index("south")] if "south" in finished else None,
+                    "levelRank": _rank_label(getattr(self.env.game, "cur_rank", 0)),
+                    "openingHands": _public_hands(self._deal_opening_hands, "open"),
                     "history": live_history,
                     "yourTurns": self._human_turns,
                     "open": True,
