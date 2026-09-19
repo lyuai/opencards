@@ -742,12 +742,13 @@ function SeatPlay({ action, className = "" }: { action?: Action; className?: str
 }
 function CardButton({ card, wild, recommended, selected, disabled, onToggle }: { card: Card; wild: boolean; recommended: boolean; selected: boolean; disabled: boolean; onToggle: () => void }) {
   const red = card.suit === "♥" || card.suit === "♦", joker = card.suit === "★", goldJoker = joker && card.rank === "RJ";
-  return <button type="button" data-card-id={card.id} disabled={disabled} aria-pressed={selected} aria-label={`${card.rank} ${card.suit}${wild ? " 逢人配" : ""}`} className={`playingCard ${red ? "red" : ""} ${joker ? "joker" : ""} ${goldJoker ? "goldJoker" : ""} ${wild ? "wild" : ""} ${recommended ? "recommended" : ""}`} onKeyDown={(event) => {
+  const mark = jokerMark(card);
+  return <button type="button" data-card-id={card.id} disabled={disabled} aria-pressed={selected} aria-label={`${joker ? (goldJoker ? "大王" : "小王") : `${card.rank} ${card.suit}`}${wild ? " 逢人配" : ""}`} className={`playingCard ${red ? "red" : ""} ${joker ? "joker" : ""} ${goldJoker ? "goldJoker" : ""} ${wild ? "wild" : ""} ${recommended ? "recommended" : ""}`} onKeyDown={(event) => {
     if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onToggle(); }
   }}>
-    <span>{joker ? (goldJoker ? "大" : "小") : card.rank}</span>
-    <i>{joker ? (goldJoker ? "★" : "☆") : card.suit}</i>
-    {wild ? <small>逢人配</small> : joker && <small>王</small>}
+    <span>{joker ? mark : card.rank}{!joker && <i>{card.suit}</i>}</span>
+    <i>{joker ? mark : card.suit}</i>
+    {wild && <small>逢人配</small>}
   </button>;
 }
 function AdviceMessage({ item }: { item: Extract<ThreadItem, { kind: "advice" }> }) {
@@ -763,8 +764,15 @@ function AdviceMessage({ item }: { item: Extract<ThreadItem, { kind: "advice" }>
 }
 
 function MiniCard({ card, played = false }: { card: Card; played?: boolean }) {
-  const tone = card.suit === "★" ? (card.rank === "RJ" ? "gold" : "silver") : (card.suit === "♥" || card.suit === "♦") ? "red" : "";
-  const label = card.suit === "★" ? (card.rank === "RJ" ? "大王" : "小王") : `${card.rank}${card.suit}`;
-  return <span className={`${tone}${played ? " playedNow" : ""}`}>{label}</span>;
+  const joker = card.suit === "★";
+  const tone = joker ? (card.rank === "RJ" ? "gold" : "silver") : (card.suit === "♥" || card.suit === "♦") ? "red" : "";
+  const mark = jokerMark(card);
+  return (
+    <span className={`miniCard ${tone}${played ? " playedNow" : ""}`}>
+      <b>{joker ? mark : card.rank}</b>
+      <i>{joker ? mark : card.suit}</i>
+    </span>
+  );
 }
-function cardText(card: Card) { return card.suit === "★" ? (card.rank === "RJ" ? "大王" : "小王") : `${card.rank}${card.suit}`; }
+function jokerMark(card: Card) { return card.rank === "RJ" ? "★" : "☆"; }
+function cardText(card: Card) { return card.suit === "★" ? jokerMark(card) : `${card.rank}${card.suit}`; }
