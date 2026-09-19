@@ -13,6 +13,9 @@ type LastDeal = {
 };
 type AIAdvice = { provider: string; recommendation: string; cardIds: string[]; combination?: Combo; rationale: string; alternatives: string[]; assumptions: string[]; confidence: number; moveAnalyses: { index: number; seat: string; summary: string; impact: string }[] };
 type ChatMessage = { role: "user" | "assistant"; content: string };
+type ThreadItem =
+  | { id: string; kind: "advice"; advice: AIAdvice; cards: Card[]; dealNumber: number }
+  | { id: string; kind: "chat"; role: "user" | "assistant"; content: string };
 type ReviewAction = { kind: "play" | "pass"; cards: Card[]; combination?: Combo | null; label: string };
 type SeatId = "south" | "west" | "north" | "east";
 type ReviewTurn = {
@@ -78,7 +81,7 @@ export function CoachLab() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [savedMatches, setSavedMatches] = useState<SavedMatch[]>([]);
   const [archive, setArchive] = useState<SavedMatch | null>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [thread, setThread] = useState<ThreadItem[]>([]);
   const [chatDraft, setChatDraft] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -94,12 +97,14 @@ export function CoachLab() {
   const [aiThinkingSeat, setAIThinkingSeat] = useState<Game["turn"] | null>(null);
   const [dealNotice, setDealNotice] = useState<LastDeal | null>(null);
   const coachPanelRef = useRef<HTMLDivElement>(null);
+  const coachTurnKey = useRef("");
   const hintIndex = useRef(0);
   const dragMode = useRef<"select" | "deselect" | null>(null);
   const dragged = useRef(new Set<string>());
 
   const dealCards = useCallback(async () => {
-    setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setChatMessages([]); setSeatPlays({}); setDealNotice(null); setReviewOpen(false); setArchive(null); setCopilotTab("coach");
+    setLoading(true); setError(""); setSelected([]); setAIAdvice(null); setThread([]); setSeatPlays({}); setDealNotice(null); setReviewOpen(false); setArchive(null); setCopilotTab("coach");
+    coachTurnKey.current = "";
     try {
       const response = await fetch(`${api}/v1/games/guandan/deals`, {
         method: "POST",
@@ -144,13 +149,13 @@ export function CoachLab() {
   }
 
   useEffect(() => {
-    if (copilotTab !== "coach" || (chatMessages.length === 0 && !chatLoading)) return;
+    if (copilotTab !== "coach" || (thread.length === 0 && !chatLoading && !coachLoading)) return;
     const frame = requestAnimationFrame(() => {
       const panel = coachPanelRef.current;
       panel?.scrollTo({ top: panel.scrollHeight, behavior: "smooth" });
     });
     return () => cancelAnimationFrame(frame);
-  }, [chatMessages, chatLoading, copilotTab]);
+  }, [thread, chatLoading, coachLoading, copilotTab]);
 
   useEffect(() => {
     if (!game || game.gameOver || game.waitingForHuman) {
@@ -239,13 +244,19 @@ export function CoachLab() {
 
   async function requestCoach(nextGame: Game, force = false) {
     if (!nextGame.waitingForHuman || nextGame.gameOver || (!autoCoach && !force)) return;
+    const turnKey = `${nextGame.id}:${nextGame.dealNumber}:${nextGame.history.length}`;
+    if (!force && coachTurnKey.current === turnKey) return;
+    coachTurnKey.current = turnKey;
     setCoachLoading(true);
     try {
       const response = await fetch(`${api}/v1/games/guandan/deals/${nextGame.id}/coach`, { method: "POST" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "教练暂不可用");
+      const cards = body.cardIds.map((id: string) => nextGame.yourHand.find((card) => card.id === id)).filter((card: Card | undefined): card is Card => Boolean(card));
       setAIAdvice(body);
+      setThread((current) => [...current, { id: `${turnKey}:${current.length}`, kind: "advice", advice: body, cards, dealNumber: nextGame.dealNumber }]);
     } catch (caught) {
+      if (coachTurnKey.current === turnKey) coachTurnKey.current = "";
       if (force || autoCoach) setError(caught instanceof Error ? caught.message : "教练暂不可用");
     } finally {
       setCoachLoading(false);
@@ -257,19 +268,22 @@ export function CoachLab() {
   async function sendCopilotMessage(message = chatDraft) {
     const clean = message.trim();
     if (!game || !clean || chatLoading) return;
-    const nextMessages: ChatMessage[] = [...chatMessages, { role: "user", content: clean }];
-    setChatMessages(nextMessages); setChatDraft(""); setChatLoading(true);
+    const history = thread.flatMap((item) => item.kind === "chat" ? [{ role: item.role, content: item.content }] : []);
+    const userItem: ThreadItem = { id: `chat-${thread.length}-user`, kind: "chat", role: "user", content: clean };
+    setThread((current) => [...current, userItem]);
+    setChatDraft("");
+    setChatLoading(true);
     try {
       const response = await fetch(`${api}/v1/games/guandan/deals/${game.id}/copilot/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: clean, conversation: chatMessages, reasoningEffort, coachingStyle }),
+        body: JSON.stringify({ message: clean, conversation: history, reasoningEffort, coachingStyle }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "教练暂时答不上来");
-      setChatMessages([...nextMessages, { role: "assistant", content: body.content }]);
+      setThread((current) => [...current, { id: `chat-${current.length}-assistant`, kind: "chat", role: "assistant", content: body.content }]);
     } catch (caught) {
-      setChatMessages([...nextMessages, { role: "assistant", content: caught instanceof Error ? caught.message : "教练暂时答不上来" }]);
+      setThread((current) => [...current, { id: `chat-${current.length}-error`, kind: "chat", role: "assistant", content: caught instanceof Error ? caught.message : "教练暂时答不上来" }]);
     } finally {
       setChatLoading(false);
     }
@@ -530,15 +544,14 @@ export function CoachLab() {
         </div>
         {copilotTab === "coach" ? <>
           <div className="coachPanel" ref={coachPanelRef}>
-            {coachLoading && !aiAdvice && <div className="coachThinking"><i /><span>正在看这一手怎么打…</span></div>}
-            {aiAdvice ? <div className="coachAnalysis">
-              <small>这一手</small>
-              <h3>{aiAdvice.cardIds.length === 0 ? "建议不出" : `建议出 ${coachCards.map(cardText).join(" ")}`}</h3>
-              <div className="recommendedCards">{coachCards.map((card) => <MiniCard card={card} key={card.id} />)}</div>
-              <p>{aiAdvice.rationale}</p>
-              {aiAdvice.alternatives.length > 0 && <ul>{aiAdvice.alternatives.map((item) => <li key={item}>{item}</li>)}</ul>}
-            </div> : !coachLoading && <div className="coachEmpty">{game ? (autoCoach ? "轮到你时会自动给出建议。" : <button className="secondary" onClick={() => void askAICoach()}>看这一手怎么打</button>) : "开局之后，这里会告诉你这一手更稳妥的打法。"}</div>}
-            <div className="chatThread">{chatMessages.map((item, index) => <div className={`chatMessage ${item.role}`} key={index}>{item.role === "assistant" ? <ReactMarkdown>{item.content}</ReactMarkdown> : item.content}</div>)}{chatLoading && <div className="chatMessage assistant">正在想…</div>}</div>
+            {thread.length === 0 && !coachLoading && <div className="coachEmpty">{game ? (autoCoach ? "轮到你时会自动给出建议。" : <button className="secondary" onClick={() => void askAICoach()}>看这一手怎么打</button>) : "开局之后，这里会告诉你这一手更稳妥的打法。"}</div>}
+            <div className="chatThread">
+              {thread.map((item) => item.kind === "advice"
+                ? <AdviceMessage key={item.id} item={item} />
+                : <div className={`chatMessage ${item.role}`} key={item.id}>{item.role === "assistant" ? <div className="md"><ReactMarkdown>{item.content}</ReactMarkdown></div> : item.content}</div>)}
+              {coachLoading && <div className="coachThinking"><i /><span>正在看这一手怎么打…</span></div>}
+              {chatLoading && <div className="chatMessage assistant">正在想…</div>}
+            </div>
           </div>
           {aiAdvice && <div className="coachQuickActions">{aiAdvice.cardIds.length === 0 ? <button className="primary" onClick={() => void act(true)}>按建议不出</button> : <><button className="secondary" onClick={() => setSelected(aiAdvice.cardIds)}>高亮</button><button className="primary" onClick={() => void act(false, aiAdvice.cardIds)}>打出建议</button></>}</div>}
           <form className="copilotComposer" onSubmit={(event) => { event.preventDefault(); void sendCopilotMessage(); }}>
@@ -737,6 +750,18 @@ function CardButton({ card, wild, recommended, selected, disabled, onToggle }: {
     {wild ? <small>逢人配</small> : joker && <small>王</small>}
   </button>;
 }
+function AdviceMessage({ item }: { item: Extract<ThreadItem, { kind: "advice" }> }) {
+  return (
+    <div className="chatMessage assistant advice">
+      <small>第 {item.dealNumber} 副 · 这一手</small>
+      <h3>{item.advice.cardIds.length === 0 ? "建议不出" : `建议出 ${item.cards.map(cardText).join(" ")}`}</h3>
+      {item.cards.length > 0 && <div className="recommendedCards">{item.cards.map((card) => <MiniCard card={card} key={card.id} />)}</div>}
+      {item.advice.rationale && <p>{item.advice.rationale}</p>}
+      {item.advice.alternatives.length > 0 && <ul>{item.advice.alternatives.map((entry) => <li key={entry}>{entry}</li>)}</ul>}
+    </div>
+  );
+}
+
 function MiniCard({ card, played = false }: { card: Card; played?: boolean }) {
   const tone = card.suit === "★" ? (card.rank === "RJ" ? "gold" : "silver") : (card.suit === "♥" || card.suit === "♦") ? "red" : "";
   const label = card.suit === "★" ? (card.rank === "RJ" ? "大王" : "小王") : `${card.rank}${card.suit}`;

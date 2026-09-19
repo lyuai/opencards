@@ -666,8 +666,8 @@ button:disabled { cursor: default; }
   overflow-y: auto;
   scrollbar-width: thin;
 }
-.coachPanel { display: grid; align-content: start; gap: 14px; }
-.coachThinking { padding: 12px; display: flex; gap: 9px; border-radius: 7px; background: var(--panel-2); color: #b9c4bc; font-size: 12px; line-height: 1.5; }
+.coachPanel { display: grid; align-content: start; gap: 10px; }
+.coachThinking { padding: 9px 10px; display: flex; gap: 9px; border-radius: 10px; background: #242d27; color: #b9c4bc; font-size: 12px; line-height: 1.45; }
 .coachThinking i { width: 7px; height: 7px; margin-top: 4px; flex: 0 0 auto; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 4px #d8aa4322; }
 .coachAnalysis { display: grid; gap: 8px; }
 .coachAnalysis small { color: #d9ad49; font-size: 11px; letter-spacing: .08em; }
@@ -684,13 +684,37 @@ button:disabled { cursor: default; }
 .recommendedCards { display: flex; flex-wrap: wrap; gap: 5px; }
 .recommendedCards span { min-width: 40px; width: auto; height: 48px; padding-inline: 6px; display: grid; place-items: center; }
 .chatThread { display: grid; gap: 8px; }
-.chatMessage { max-width: 92%; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
-.chatMessage.user { justify-self: end; background: var(--gold); color: var(--gold-ink); }
+.chatMessage { max-width: 92%; padding: 9px 10px; border-radius: 10px; font-size: 13px; line-height: 1.45; }
+.chatMessage.user { justify-self: end; background: var(--gold); color: var(--gold-ink); white-space: pre-wrap; }
 .chatMessage.assistant { justify-self: start; background: #242d27; color: #d8dfda; }
-.chatMessage > :first-child { margin-top: 0; }
-.chatMessage > :last-child { margin-bottom: 0; }
-.chatMessage p { margin: 0 0 7px; }
-.chatMessage ul, .chatMessage ol { margin: 5px 0 8px; padding-left: 18px; }
+.chatMessage.advice { max-width: 100%; display: grid; gap: 6px; }
+.chatMessage.advice small { color: #d9ad49; font-size: 11px; letter-spacing: .06em; }
+.chatMessage.advice h3 { margin: 0; color: #f0e5c9; font-size: 16px; line-height: 1.3; }
+.chatMessage.advice p, .chatMessage.advice li { margin: 0; color: #c2cbc5; font-size: 13px; line-height: 1.45; }
+.chatMessage.advice ul { margin: 0; padding-left: 1.2em; }
+.chatMessage.advice .recommendedCards { margin: 2px 0; }
+.md { display: grid; gap: 0.45em; }
+.md > * { margin: 0; min-width: 0; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 {
+  margin-top: 0.2em;
+  color: #eef2ef;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.md h1 { font-size: 15px; }
+.md h2 { font-size: 14px; }
+.md p, .md li { line-height: 1.45; }
+.md ul, .md ol { padding-left: 1.2em; }
+.md li + li { margin-top: 0.2em; }
+.md li > * { margin: 0; }
+.md li > * + * { margin-top: 0.25em; }
+.md hr { width: 100%; border: 0; border-top: 1px solid #3c4941; }
+.md blockquote { padding-left: 0.7em; border-left: 2px solid #4f7f66; color: #b7c8bd; }
+.md code { padding: 0.05em 0.35em; border-radius: 4px; background: #1a221d; font-size: 0.92em; }
+.md pre { padding: 8px 10px; overflow-x: auto; border-radius: 6px; background: #1a221d; }
+.md pre code { padding: 0; background: none; }
+.md strong { color: #eef2ef; }
 .coachQuickActions {
   display: grid;
   grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);

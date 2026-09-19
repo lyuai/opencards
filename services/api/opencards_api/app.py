@@ -23,7 +23,7 @@ def create_app(testing: bool = False) -> Flask:
     app.config["TESTING"] = testing
     origins = [item.strip() for item in os.getenv(
         "WEB_ORIGIN",
-        "http://localhost:3000,http://localhost:3001,https://labs.lyu.ai,https://dan.lyu.ai,https://opencards-web.onrender.com",
+        "http://localhost:3000,http://localhost:3001,http://localhost:3010,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3010,https://labs.lyu.ai,https://dan.lyu.ai,https://opencards-web.onrender.com",
     ).split(",") if item.strip()]
     CORS(app, origins=origins)
     data_dir = Path(os.getenv("OPENCARDS_DATA_DIR", Path(__file__).parents[1] / "data"))
